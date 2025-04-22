@@ -126,6 +126,8 @@ class SeleniumManager:
                         return self.solver.solve_rotate_v2()
                     elif captcha_type == CaptchaType.SHAPES_V1:
                         return self.solver.solve_shapes()
+                    elif captcha_type == CaptchaType.SHAPES_V2:
+                        return self.solver.solve_shapes_v2()
                     elif captcha_type == CaptchaType.ROTATE_V1:
                         return self.solver.solve_rotate()
                     elif captcha_type == CaptchaType.ICON_V1:
