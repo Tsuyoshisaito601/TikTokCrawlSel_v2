@@ -33,15 +33,37 @@ class SeleniumManager:
             # その他の設定
             options.add_argument('--no-sandbox')
             options.add_argument('--use-angle=gl')
-            options.add_argument('--enable-features=Vulkan')
+            options.add_argument('--enable-features=Vulkan,VaapiVideoDecoder')
             options.add_argument('--disable-vulkan-surface')
             options.add_argument('--enable-gpu-rasterization')
             options.add_argument('--enable-zero-copy')
             options.add_argument('--ignore-gpu-blocklist')
             options.add_argument('--enable-hardware-overlays')
-            options.add_argument('--enable-features=VaapiVideoDecoder')
             options.add_argument('--mute-audio')
             options.add_argument('--start-maximized')
+            extra_flags = [
+                # JS タイマー／Renderer を背景でも止めない
+                '--disable-background-timer-throttling',
+                '--disable-renderer-backgrounding',
+                '--disable-backgrounding-occluded-windows',
+
+                # 自動タブ破棄（メモリ不足時にプロセス kill）の無効化
+                '--disable-tab-discarding',
+
+                # バッテリーセーバーや Energy Saver モードを無効化
+                '--battery-saver-mode=disable',
+
+                # オートプレイ規制を緩和（音付きでもユーザー操作不要）
+                '--autoplay-policy=no-user-gesture-required',
+
+                # Chromium “features” として実装された追加抑制を止める
+                '--disable-features='
+                'CalculateBackgroundVideoPlaybackMinFrameRate,'
+                'PauseBackgroundTabsMediaToggle,'
+                'IntensiveWakeUpThrottling'
+            ]
+            for f in extra_flags:
+                options.add_argument(f)
 
             self.driver = uc.Chrome(options=options)
 
