@@ -12,7 +12,7 @@ from selenium.common.exceptions import (
 )
 from concurrent.futures import ThreadPoolExecutor
 from ..logger import setup_logger
-import time
+import tempfile, shutil, os, time, logging
 
 logger = setup_logger(__name__)
 
@@ -25,12 +25,14 @@ class SeleniumManager:
 
     def setup_driver(self):
         try:
+            profile_dir = tempfile.mkdtemp(prefix="sel_profile_")
             # 共通のオプション設定
             options = uc.ChromeOptions()
             if self.proxy:
                 options.add_argument(f'--proxy-server={self.proxy}')
             
             # その他の設定
+            options.add_argument(f"--user-data-dir={profile_dir}")
             options.add_argument('--no-sandbox')
             options.add_argument('--use-angle=gl')
             options.add_argument('--enable-features=Vulkan,VaapiVideoDecoder')

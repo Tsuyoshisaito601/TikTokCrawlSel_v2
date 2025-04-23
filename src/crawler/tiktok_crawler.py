@@ -167,6 +167,8 @@ def parse_tiktok_number(text: str) -> Optional[int]:
 
 class TikTokCrawler:
     BASE_URL = "https://www.tiktok.com"
+    OOM_RETRY_WAIT   = 600          # 10分
+    OOM_RETRY_MAX    = 2
     
     # TikTokクローラーの初期化
     # Args:
@@ -284,35 +286,62 @@ class TikTokCrawler:
     #     username: ユーザー名
     def navigate_to_user_page(self, username: str):
         logger.debug(f"ユーザー @{username} のページに移動中...")
-        self.driver.get(f"{self.BASE_URL}/@{username}")
-        self._random_sleep(2.0, 4.0)
+        retry = 0
+        while True:
+            self.driver.get(f"{self.BASE_URL}/@{username}")
+            self._random_sleep(2.0, 4.0)
 
-        # user-page要素の存在を待機
-        self.wait.until(
-            EC.presence_of_element_located((By.CSS_SELECTOR, "[data-e2e='user-page']"))
-        )
-
-        try:
-            self.wait.until(
-                EC.presence_of_element_located((By.CSS_SELECTOR, "[data-e2e='user-post-item']"))
-            )
-        
-        except TimeoutException:
             try:
-                 # アカウント削除確認用の要素を探す
-                deleted_account_element = self.driver.find_element(By.CSS_SELECTOR, "div.css-1osbocj-DivErrorContainer")
-                error_text = deleted_account_element.find_element(By.CSS_SELECTOR, "p.css-1y4x9xk-PTitle").text
+                # user-page要素の存在を待機
+                self.wait.until(
+                    EC.presence_of_element_located((By.CSS_SELECTOR, "[data-e2e='user-page']"))
+                )
+
+                self.wait.until(
+                    EC.presence_of_element_located((By.CSS_SELECTOR, "[data-e2e='user-post-item']"))
+                )
+                return
             
-                if error_text == "このアカウントは見つかりませんでした":
-                    logger.info(f"ユーザー @{username} は削除されたようです。データベースのis_aliveをFalseに更新します。")
-                    self.favorite_user_repo.update_favorite_user_is_alive(username, False)
-                    raise self.TikTokUserNotFoundException(f"ユーザー @{username} は存在しません")
-            except NoSuchElementException:
-                # 削除確認要素が見つからない場合は正常なユーザーページとして処理を続行
-                pass        
-        # ユーザーページの読み込みを確認
-        logger.debug(f"ユーザー @{username} のページに移動しました")
-            
+            except TimeoutException:
+                if self._is_deleted_account():
+                    self.favorite_user_repo.update_favorite_user_is_alive(username, False) 
+                    raise self.TikTokUserNotFoundException(f"ユーザー @{username} は存在しません")   # アカウント削除確認用の要素を探す
+                if self.crashed_by_bom():
+                    if retry >= self.OOM_RETRY_MAX:
+                        logger.error("OOM リトライ上限に達したため終了")
+                        raise
+                    logger.warning("OOM 検出 → 10分後にドライバ再生成してリトライ")
+                    self._recreate_driver_after_sleep()
+                    retry += 1
+                    continue
+
+                raise
+    def _is_deleted_account(self) -> bool:
+        try:
+            elem = self.driver.find_element(By.CSS_SELECTOR, "div.css-1osbocj-DivErrorContainer")
+            text = elem.find_element(By.CSS_SELECTOR, "p.css-1y4x9xk-PTitle").text.strip()
+            return text == "このアカウントは見つかりませんでした"
+        except NoSuchElementException:
+            return False
+        
+    def _crashed_by_oom(self) -> bool:
+        try:
+            if self.driver.current_url.startswith("chrome-error://"):
+                return True
+            code = self.driver.find_element(By.CSS_SELECTOR, "#error-code").text.lower()
+            return "out of memory" in code
+        except NoSuchElementException:
+            return False
+        
+    def _recreate_driver_after_sleep(self):
+        try:
+            self.driver.quit()
+        except Exception:
+            pass
+        time.sleep(self.OOM_RETRY_WAIT)
+        self.selenium_manager = SeleniumManager(self.crawler_account.proxy, self.sadcaptcha_api_key)
+        self.driver = self.selenium_manager.setup_driver()
+        self.wait = WebDriverWait(self.driver, 15)  # タイムアウトを15秒に変更
     # ユーザーページをスクロールする
     # Condition: ユーザーページが開かれていること
     # Args:
