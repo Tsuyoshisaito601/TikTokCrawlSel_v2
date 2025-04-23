@@ -259,7 +259,7 @@ class VideoRepository:
             動画URLとサムネイルURLの辞書のリスト
         """
         query = """
-            SELECT video_url, video_thumbnail_url
+            SELECT video_url, video_thumbnail_url,play_count,video_alt_info_text
             FROM video_light_raw_data
             WHERE user_username = %s
             AND needs_update = 1
@@ -271,7 +271,9 @@ class VideoRepository:
         return [
             {
                 "video_url": row[0],
-                "video_thumbnail_url": row[1]
+                "video_thumbnail_url": row[1],
+                "play_count": row[2],
+                "video_alt_info_text": row[3]
             }
             for row in rows
         ]

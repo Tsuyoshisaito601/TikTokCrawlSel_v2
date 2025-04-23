@@ -153,7 +153,7 @@ class SeleniumManager:
                             logger.debug("リフレッシュボタンをクリックしました")
                         except (NoSuchElementException, ElementClickInterceptedException) as e:
                             logger.debug(f"リフレッシュボタンが押せませんでした: {e}")
-                        return False
+                        continue
                     except Exception as e:
                         logger.error(f"CAPTCHA解決中にエラーが発生しました: {e}")
                         return False
