@@ -16,9 +16,11 @@ from ..database.repositories import CrawlerAccountRepository, FavoriteUserReposi
 from ..database.database import Database
 from .selenium_manager import SeleniumManager
 from ..logger import setup_logger
+import grpc
 from google.cloud import pubsub_v1
 
 logger = setup_logger(__name__)
+pubsub_emulator_host = os.getenv('PUBSUB_EMULATOR_HOST')
 project_id = os.getenv('PROJECT_ID') 
 
 
@@ -167,8 +169,6 @@ def parse_tiktok_number(text: str) -> Optional[int]:
 
 class TikTokCrawler:
     BASE_URL = "https://www.tiktok.com"
-    OOM_RETRY_WAIT   = 600          # 10分
-    OOM_RETRY_MAX    = 2
     
     # TikTokクローラーの初期化
     # Args:
@@ -193,6 +193,7 @@ class TikTokCrawler:
         self.driver = None
         self.wait = None
         self.sadcaptcha_api_key = "fd31d51515ed18cadec7d4a522894997"
+        self.login_restart_attempted = False        # ← 追加
 
     def __enter__(self):
         # クローラーアカウントを取得
@@ -260,7 +261,7 @@ class TikTokCrawler:
         login_button = self.wait.until(
             EC.element_to_be_clickable((By.CSS_SELECTOR, "button[type='submit']"))
         )
-        self._random_sleep(3.0, 4.0)
+        self._random_sleep(5.0, 7.0)
         login_button.click()
 
         # CAPTCHAチェック
@@ -268,13 +269,36 @@ class TikTokCrawler:
 
         # ログイン完了を待機
         # プロフィールアイコンが表示されるまで待機（60秒待機）
-        login_wait = WebDriverWait(self.driver, 60)  # 絵合わせ認証が出てきたら人力で解いてね
-        login_wait.until(
-            EC.presence_of_element_located((By.CSS_SELECTOR, "[data-e2e='profile-icon']")),
-        )
-        logger.info(f"クロール用アカウント{self.crawler_account.username}でTikTokへのログインに成功しました")
+        try:
+            login_wait = WebDriverWait(self.driver, 60)  # 絵合わせ認証が出てきたら人力で解いてね
+            login_wait.until(
+                EC.presence_of_element_located((By.CSS_SELECTOR, "[data-e2e='profile-icon']")),
+            )
+            logger.info(f"クロール用アカウント{self.crawler_account.username}でTikTokへのログインに成功しました")
+        except TimeoutException:
+            logger.warning("60 秒以内にプロフィールアイコンが見つかりません。CAPTCHA を再チェックします…")
+            # CAPTCHA を再確認してもう一度だけ待つ
+            self._check_and_handle_captcha()
+            try:
+                WebDriverWait(self.driver, 60).until(   # 2 回目。失敗すれば例外を上げて上位で処理
+                    EC.presence_of_element_located((By.CSS_SELECTOR, "[data-e2e='profile-icon']"))
+                )
 
+                logger.info(f"クロール用アカウント{self.crawler_account.username}でTikTokへのログインに成功しました")
+            except TimeoutException:
+                if not self.login_restart_attempted:
+                    logger.warning("再ログインのためブラウザを再起動します…")
+                    self.login_restart_attempted = True
 
+                    # ドライバを閉じて新規起動
+                    self.selenium_manager.quit_driver()
+                    self.driver = self.selenium_manager.setup_driver()
+                    self.wait   = WebDriverWait(self.driver, 15)
+
+                    return self._login()           # ← ここで再ログイン
+                else:
+                    # それでもダメなら例外を上へ
+                    raise
     # TikTokユーザーが見つからない（アカウントが削除されている等）場合の例外
     # ユーザー単位の関数で最も大きいところで処置完了するように設計しましょう
     class TikTokUserNotFoundException(Exception):
@@ -286,62 +310,35 @@ class TikTokCrawler:
     #     username: ユーザー名
     def navigate_to_user_page(self, username: str):
         logger.debug(f"ユーザー @{username} のページに移動中...")
-        retry = 0
-        while True:
-            self.driver.get(f"{self.BASE_URL}/@{username}")
-            self._random_sleep(2.0, 4.0)
+        self.driver.get(f"{self.BASE_URL}/@{username}")
+        self._random_sleep(2.0, 4.0)
 
+        # user-page要素の存在を待機
+        self.wait.until(
+            EC.presence_of_element_located((By.CSS_SELECTOR, "[data-e2e='user-page']"))
+        )
+
+        try:
+            self.wait.until(
+                EC.presence_of_element_located((By.CSS_SELECTOR, "[data-e2e='user-post-item']"))
+            )
+        
+        except TimeoutException:
             try:
-                # user-page要素の存在を待機
-                self.wait.until(
-                    EC.presence_of_element_located((By.CSS_SELECTOR, "[data-e2e='user-page']"))
-                )
-
-                self.wait.until(
-                    EC.presence_of_element_located((By.CSS_SELECTOR, "[data-e2e='user-post-item']"))
-                )
-                return
+                 # アカウント削除確認用の要素を探す
+                deleted_account_element = self.driver.find_element(By.CSS_SELECTOR, "div.css-1osbocj-DivErrorContainer")
+                error_text = deleted_account_element.find_element(By.CSS_SELECTOR, "p.css-1y4x9xk-PTitle").text
             
-            except TimeoutException:
-                if self._is_deleted_account():
-                    self.favorite_user_repo.update_favorite_user_is_alive(username, False) 
-                    raise self.TikTokUserNotFoundException(f"ユーザー @{username} は存在しません")   # アカウント削除確認用の要素を探す
-                if self.crashed_by_bom():
-                    if retry >= self.OOM_RETRY_MAX:
-                        logger.error("OOM リトライ上限に達したため終了")
-                        raise
-                    logger.warning("OOM 検出 → 10分後にドライバ再生成してリトライ")
-                    self._recreate_driver_after_sleep()
-                    retry += 1
-                    continue
-
-                raise
-    def _is_deleted_account(self) -> bool:
-        try:
-            elem = self.driver.find_element(By.CSS_SELECTOR, "div.css-1osbocj-DivErrorContainer")
-            text = elem.find_element(By.CSS_SELECTOR, "p.css-1y4x9xk-PTitle").text.strip()
-            return text == "このアカウントは見つかりませんでした"
-        except NoSuchElementException:
-            return False
-        
-    def _crashed_by_oom(self) -> bool:
-        try:
-            if self.driver.current_url.startswith("chrome-error://"):
-                return True
-            code = self.driver.find_element(By.CSS_SELECTOR, "#error-code").text.lower()
-            return "out of memory" in code
-        except NoSuchElementException:
-            return False
-        
-    def _recreate_driver_after_sleep(self):
-        try:
-            self.driver.quit()
-        except Exception:
-            pass
-        time.sleep(self.OOM_RETRY_WAIT)
-        self.selenium_manager = SeleniumManager(self.crawler_account.proxy, self.sadcaptcha_api_key)
-        self.driver = self.selenium_manager.setup_driver()
-        self.wait = WebDriverWait(self.driver, 15)  # タイムアウトを15秒に変更
+                if error_text == "このアカウントは見つかりませんでした":
+                    logger.info(f"ユーザー @{username} は削除されたようです。データベースのis_aliveをFalseに更新します。")
+                    self.favorite_user_repo.update_favorite_user_is_alive(username, False)
+                    raise self.TikTokUserNotFoundException(f"ユーザー @{username} は存在しません")
+            except NoSuchElementException:
+                # 削除確認要素が見つからない場合は正常なユーザーページとして処理を続行
+                pass        
+        # ユーザーページの読み込みを確認
+        logger.debug(f"ユーザー @{username} のページに移動しました")
+            
     # ユーザーページをスクロールする
     # Condition: ユーザーページが開かれていること
     # Args:
@@ -1137,7 +1134,7 @@ def main():
             favorite_user_repo=favorite_user_repo,
             video_repo=video_repo,
             crawler_account_id=args.crawler_account_id,
-            sadcaptcha_api_key=os.getenv("SADCAPTCHA_API_KEY")  # APIキーを設定
+            sadcaptcha_api_key="fd31d51515ed18cadec7d4a522894997"  # APIキーを設定
         ) as crawler:
             crawler.crawl_favorite_users(
                 light_or_heavy=args.mode,
