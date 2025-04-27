@@ -1134,7 +1134,7 @@ def main():
             favorite_user_repo=favorite_user_repo,
             video_repo=video_repo,
             crawler_account_id=args.crawler_account_id,
-            sadcaptcha_api_key="fd31d51515ed18cadec7d4a522894997"  # APIキーを設定
+            sadcaptcha_api_key=os.getenv("SADCAPTCHA_API_KEY")  # APIキーを設定
         ) as crawler:
             crawler.crawl_favorite_users(
                 light_or_heavy=args.mode,
