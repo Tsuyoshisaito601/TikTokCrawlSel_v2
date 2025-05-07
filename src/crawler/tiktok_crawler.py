@@ -644,6 +644,7 @@ class TikTokCrawler:
         logger.debug(f"動画の軽いデータの後半を取得中...")
 
         video_stats = []
+        self._random_sleep(25.0, 30.0)
         # クリエイターの動画一覧をスクロール
         self.scroll_video_page_creator_videos_tab(max_videos)
         video_elements = self.driver.find_elements(By.CSS_SELECTOR, "[class='css-eqiq8z-DivItemContainer eadndt66']")

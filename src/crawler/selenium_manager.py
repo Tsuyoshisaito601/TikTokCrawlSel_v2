@@ -69,6 +69,20 @@ class SeleniumManager:
 
             self.driver = uc.Chrome(options=options)
 
+            self.driver.execute_cdp_cmd(
+                "Emulation.setDeviceMetricsOverride",
+                {
+                    "width": 1920,
+                    "height": 1080,
+                    "deviceScaleFactor": 1,
+                    "mobile": False,          # ← これが最重要
+                    "screenWidth": 1920,      # ↓ 省略可だが揃えておくと安全
+                    "screenHeight": 1080,
+                    "positionX": 0,
+                    "positionY": 0,
+                },
+            )    
+
             if self.sadcaptcha_api_key:
                 # CAPTCHA Solver使用時
                 logger.info("CAPTCHA Solver付きのドライバーを作成します")
