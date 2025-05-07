@@ -311,7 +311,9 @@ class TikTokCrawler:
     def navigate_to_user_page(self, username: str):
         logger.debug(f"ユーザー @{username} のページに移動中...")
         self.driver.get(f"{self.BASE_URL}/@{username}")
+        self.driver.execute_script("document.body.style.width=''")   # ← 各ページ後に一発
         self._random_sleep(2.0, 4.0)
+        
 
         # user-page要素の存在を待機
         self.wait.until(
@@ -410,6 +412,7 @@ class TikTokCrawler:
     def get_video_light_like_datas_from_user_page(self, max_videos: int = 100) -> List[Dict[str, str]]:
         logger.debug(f"動画の軽いデータの前半を取得中...")
         video_stats = []
+        self._random_sleep(30.0, 35.0)
         
         self.scroll_user_page(max_videos)
         video_elements = self.driver.find_elements(By.CSS_SELECTOR, "[data-e2e='user-post-item']")
