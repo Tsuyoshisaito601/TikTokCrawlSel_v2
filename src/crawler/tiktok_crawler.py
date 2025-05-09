@@ -483,26 +483,36 @@ class TikTokCrawler:
     # Args:
     #     video_url: 動画のURL
     #     link_should_be_in_page: 動画ページへのリンクがページに含まれているはずか
-    def navigate_to_video_page(self, video_url: str, link_should_be_in_page: bool = True):
+    def navigate_to_video_page(self, video_url: str, link_should_be_in_page: bool = True) -> bool:
         logger.debug(f"動画ページに移動中...: {video_url}")
+        direct_access = False
 
         if link_should_be_in_page:
             try:
-                video_link = self.driver.find_element(By.CSS_SELECTOR, f"a[href='{video_url}'")
+                video_link = self.driver.find_element(By.CSS_SELECTOR, f"a[href='{video_url}']")
                 video_link.click()
             except NoSuchElementException:
                 logger.warning(f"動画ページへのリンクが見つからなかったので直接アクセスします: {video_url}")
                 self.driver.get(video_url)
+                direct_access = True
         else:
             self.driver.get(video_url)
+            direct_access = True
         
-        self._random_sleep(2.0, 4.0)
+        # 直接アクセスしたかどうかによって待機する要素を変える
+        if direct_access:
+            # 直接アクセスした場合の要素待機
+            self.wait.until(
+                EC.presence_of_element_located((By.CSS_SELECTOR, "[data-e2e='detail-video']"))
+            )
+        else:
+            # リンクからアクセスした場合の要素待機
+            self.wait.until(
+                EC.presence_of_element_located((By.CSS_SELECTOR, "[data-e2e='user-title']"))
+            )
         
-        # 動画の詳細情報を待機
-        self.wait.until(
-            EC.presence_of_element_located((By.CSS_SELECTOR, "[data-e2e='user-title']"))
-        )
         logger.debug(f"動画ページに移動しました: {video_url}")
+        return direct_access
 
     # 動画ページの重いデータを取得する
     # Condition: 動画ページが開かれていること
@@ -519,6 +529,35 @@ class TikTokCrawler:
         audio_info_text = self.driver.find_element(By.CSS_SELECTOR, "[data-e2e='browse-music'] .css-pvx3oa-DivMusicText").text
         like_count_text = self.driver.find_element(By.CSS_SELECTOR, "strong[data-e2e='browse-like-count']").text
         comment_count_text = self.driver.find_element(By.CSS_SELECTOR, "strong[data-e2e='browse-comment-count']").text
+        collect_count_text = self.driver.find_element(By.CSS_SELECTOR, "strong[data-e2e='undefined-count']").text
+        
+        logger.debug(f"動画の重いデータを取得しました: {video_url}")
+
+        return {
+            "video_url": video_url,
+            "user_username": user_username,
+            "user_nickname": user_nickname,
+            "video_title": video_title,
+            "post_time_text": post_time_text,
+            "audio_url": audio_url,
+            "audio_info_text": audio_info_text,
+            "like_count_text": like_count_text,
+            "comment_count_text": comment_count_text,
+            "collect_count_text": collect_count_text,
+            "crawling_algorithm": "selenium-human-like-1"
+        }
+    def get_video_heavy_data_from_direct_access(self) -> Dict[str, str]:
+        logger.debug(f"動画の重いデータを取得中...")
+    
+        video_url = self.driver.current_url
+        user_username = self.driver.find_element(By.CSS_SELECTOR, "[data-e2e='browse-username']").text
+        user_nickname = self.driver.find_element(By.CSS_SELECTOR, "[data-e2e='browser-nickname']").text
+        video_title = self.driver.find_element(By.CSS_SELECTOR, "[data-e2e='browse-video-desc']").text
+        post_time_text = self.driver.find_element(By.CSS_SELECTOR, "[data-e2e='browser-nickname'] span:last-child").text
+        audio_url = self.driver.find_element(By.CSS_SELECTOR, "[data-e2e='browse-music'] a").get_attribute("href")
+        audio_info_text = self.driver.find_element(By.CSS_SELECTOR, "[data-e2e='browse-music'] .css-pvx3oa-DivMusicText").text
+        like_count_text = self.driver.find_element(By.CSS_SELECTOR, "strong[data-e2e='like-count']").text
+        comment_count_text = self.driver.find_element(By.CSS_SELECTOR, "strong[data-e2e='comment-count']").text
         collect_count_text = self.driver.find_element(By.CSS_SELECTOR, "strong[data-e2e='undefined-count']").text
         
         logger.debug(f"動画の重いデータを取得しました: {video_url}")
@@ -951,32 +990,32 @@ class TikTokCrawler:
                     for light_like_data in light_like_datas:
                         if light_like_data["video_url"] in processed_urls:
                             continue
-                            
                         try:
-                            self.navigate_to_video_page(light_like_data["video_url"])
-                            try:
+                            direct_access = self.navigate_to_video_page(light_like_data["video_url"])
+                            if direct_access:
+                                heavy_data = self.get_video_heavy_data_from_direct_access()
+                            else:                            
                                 heavy_data = self.get_video_heavy_data_from_video_page()
-                                self.parse_and_save_video_heavy_data(heavy_data, light_like_data["video_thumbnail_url"], light_like_data.get("play_count"),light_like_data.get("video_alt_info_text"))
-                                
-                                # 投稿日時を取得して記録
-                                post_time = parse_tiktok_time(heavy_data.get("post_time_text"), datetime.now())
-                                if post_time:
-                                    last_post_time = post_time
-                                
-                                processed_urls.add(light_like_data["video_url"])
-                                self._random_sleep(10.0, 20.0)
-                                
-                            except Exception:
-                                logger.exception(f"動画ページを開いた状態でエラーが発生しました。動画ページを閉じてユーザーページに戻ります。")
-                                raise
-                            finally:
-                                self.navigate_to_user_page_from_video_page()
+
+                            self.parse_and_save_video_heavy_data(heavy_data, light_like_data["video_thumbnail_url"], light_like_data.get("play_count"),light_like_data.get("video_alt_info_text"))
+                            
+                            # 投稿日時を取得して記録
+                            post_time = parse_tiktok_time(heavy_data.get("post_time_text"), datetime.now())
+                            if post_time:
+                                last_post_time = post_time
+                            
+                            processed_urls.add(light_like_data["video_url"])
+                            self._random_sleep(10.0, 20.0)
+                                    
                                 
                         except KeyboardInterrupt:
                             raise
                         except Exception:
                             logger.exception(f"動画 {light_like_data['video_url']} の重いデータのクロール中に失敗。スキップします")
                             continue
+                        finally:
+                            # ここで必ず戻る
+                            self.navigate_to_user_page_from_video_page()
                     
                     # 最後に処理した動画の投稿日時が2025/1/1より前なら終了
                     if last_post_time and last_post_time < target_date:
@@ -1031,21 +1070,21 @@ class TikTokCrawler:
                 logger.info(f"更新が必要な動画の重いデータのクロールを開始します")
                 for video in videos_needing_update:
                     try:
-                        self.navigate_to_video_page(video["video_url"])
-                        try:
+                        direct_access = self.navigate_to_video_page(video["video_url"])
+                        if direct_access:
+                            heavy_data = self.get_video_heavy_data_from_direct_access()
+                        else:                            
                             heavy_data = self.get_video_heavy_data_from_video_page()
-                            self.parse_and_save_video_heavy_data(heavy_data, video["video_thumbnail_url"], video.get("play_count"),video.get("video_alt_info_text"))
-                            self._random_sleep(10.0, 20.0)
-                        except Exception:
-                            logger.exception(f"動画ページを開いた状態でエラーが発生しました。動画ページを閉じてユーザーページに戻ります。")
-                            raise
-                        finally:
-                            self.navigate_to_user_page_from_video_page()
+                        self.parse_and_save_video_heavy_data(heavy_data, video["video_thumbnail_url"], video.get("play_count"),video.get("video_alt_info_text"))
+                        self._random_sleep(10.0, 20.0)
                     except KeyboardInterrupt:
                         raise
                     except Exception:
                         logger.exception(f"動画 {video['video_url']} の重いデータのクロール中に失敗。スキップします")
                         continue
+                    finally:
+                        # ここで必ず戻る
+                        self.navigate_to_user_page_from_video_page()
 
                 logger.info(f"ユーザー @{user.favorite_user_username} の重いデータのクロールを完了しました")
             logger.info(f"ユーザー @{user.favorite_user_username} の重いデータのクロールを完了しました")
