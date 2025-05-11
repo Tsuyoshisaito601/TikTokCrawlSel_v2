@@ -582,7 +582,10 @@ class TikTokCrawler:
         logger.debug("動画ページの閉じるボタンをクリックしてユーザーページに戻ります...")
 
         close_button = self.wait.until(
-            EC.presence_of_element_located((By.CSS_SELECTOR, "[data-e2e='browse-close']"))
+                    EC.any_of(
+            EC.presence_of_element_located((By.CSS_SELECTOR, "[data-e2e='browse-close']")),
+            EC.presence_of_element_located((By.CSS_SELECTOR, "a[data-e2e='browse-user-avatar']"))
+        )
         )
         close_button.click()
         self._random_sleep(1.0, 2.0)
