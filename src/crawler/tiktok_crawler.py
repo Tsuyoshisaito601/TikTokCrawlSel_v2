@@ -486,32 +486,67 @@ class TikTokCrawler:
     def navigate_to_video_page(self, video_url: str, link_should_be_in_page: bool = True) -> bool:
         logger.debug(f"動画ページに移動中...: {video_url}")
         direct_access = False
-
-        if link_should_be_in_page:
+        max_retries = 3
+        retry_count = 0
+        
+        while retry_count < max_retries:
             try:
-                video_link = self.driver.find_element(By.CSS_SELECTOR, f"a[href='{video_url}']")
-                video_link.click()
-            except NoSuchElementException:
-                logger.warning(f"動画ページへのリンクが見つからなかったので直接アクセスします: {video_url}")
-                self.driver.get(video_url)
-                direct_access = True
-        else:
-            self.driver.get(video_url)
-            direct_access = True
+                if link_should_be_in_page:
+                    try:
+                        video_link = self.driver.find_element(By.CSS_SELECTOR, f"a[href='{video_url}']")
+                        self.driver.execute_script("arguments[0].click();", video_link)
+                    except NoSuchElementException:
+                        logger.warning(f"動画ページへのリンクが見つからなかったので直接アクセスします: {video_url}")
+                        self.driver.get(video_url)
+                        direct_access = True
+                else:
+                    self.driver.get(video_url)
+                    direct_access = True
+                
+                # ページが読み込まれるまで十分に待機
+                self._random_sleep(3.0, 5.0)
+                
+                # 複数の可能性のある要素のいずれかが表示されるまで待機
+                try:
+                    if direct_access:
+                        WebDriverWait(self.driver, 20).until(
+                            EC.any_of(
+                                EC.presence_of_element_located((By.CSS_SELECTOR, "[data-e2e='detail-video']")),
+                                EC.presence_of_element_located((By.CSS_SELECTOR, "[data-e2e='browse-video']")),
+                                EC.presence_of_element_located((By.CSS_SELECTOR, "video")),
+                                EC.presence_of_element_located((By.CSS_SELECTOR, "[class*='DivVideoContainer']"))
+                            )
+                        )
+                    else:
+                        WebDriverWait(self.driver, 20).until(
+                            EC.any_of(
+                                EC.presence_of_element_located((By.CSS_SELECTOR, "[data-e2e='user-title']")),
+                                EC.presence_of_element_located((By.CSS_SELECTOR, "[data-e2e='browse-username']")),
+                                EC.presence_of_element_located((By.CSS_SELECTOR, "[class*='DivInfoContainer']"))
+                            )
+                        )
+                    
+                    logger.debug(f"動画ページに移動しました: {video_url}")
+                    return direct_access
+                    
+                except TimeoutException:
+                    # 特定の要素が見つからなくても、ページが読み込まれているか確認
+                    if "tiktok.com" in self.driver.current_url:
+                        logger.warning(f"ページは読み込まれましたが、期待する要素が見つかりませんでした。処理を続行します: {video_url}")
+                        return direct_access
+                    raise
+                
+            except Exception as e:
+                retry_count += 1
+                logger.warning(f"動画ページへの移動に失敗 (試行 {retry_count}/{max_retries}): {str(e)}")
+                
+                if retry_count >= max_retries:
+                    logger.error("最大試行回数に達しました。エラーを再発生させます。")
+                    raise
+                
+                # ブラウザをリフレッシュして再試行
+                self._random_sleep(5.0, 8.0)
         
-        # 直接アクセスしたかどうかによって待機する要素を変える
-        if direct_access:
-            # 直接アクセスした場合の要素待機
-            self.wait.until(
-                EC.presence_of_element_located((By.CSS_SELECTOR, "[data-e2e='detail-video']"))
-            )
-        else:
-            # リンクからアクセスした場合の要素待機
-            self.wait.until(
-                EC.presence_of_element_located((By.CSS_SELECTOR, "[data-e2e='user-title']"))
-            )
-        
-        logger.debug(f"動画ページに移動しました: {video_url}")
         return direct_access
 
     # 動画ページの重いデータを取得する
@@ -580,35 +615,133 @@ class TikTokCrawler:
     # Condition: もともとユーザーページからのクリックで動画ページが開かれていること
     def navigate_to_user_page_from_video_page(self):
         logger.debug("動画ページの閉じるボタンをクリックしてユーザーページに戻ります...")
-
-        close_button = self.wait.until(
-                    EC.any_of(
-            EC.presence_of_element_located((By.CSS_SELECTOR, "[data-e2e='browse-close']")),
-            EC.presence_of_element_located((By.CSS_SELECTOR, "a[data-e2e='browse-user-avatar']"))
-        )
-        )
-        close_button.click()
-        self._random_sleep(1.0, 2.0)
         
-        # ユーザーページの動画一覧が表示されるまで待機
-        self.wait.until(
-            EC.presence_of_element_located((By.CSS_SELECTOR, "[data-e2e='user-post-item']"))
-        )
-        logger.debug("ユーザーページに戻りました")
-
+        max_retries = 3
+        retry_count = 0
+        current_url = self.driver.current_url
+        
+        # 現在のURLからユーザー名を抽出（バックアップ用）
+        try:
+            user_username = None
+            if '@' in current_url:
+                user_username = current_url.split('@')[1].split('/')[0]
+            elif '/user/' in current_url:
+                user_username = self.driver.find_element(By.CSS_SELECTOR, "[data-e2e='browse-username']").text.strip('@')
+        except Exception:
+            logger.warning("URLからユーザー名の抽出に失敗しました", exc_info=True)
+        
+        while retry_count < max_retries:
+            try:
+                # 複数の可能性のある閉じるボタンを探す
+                try:
+                    close_button = WebDriverWait(self.driver, 8).until(
+                        EC.any_of(
+                            EC.element_to_be_clickable((By.CSS_SELECTOR, "[data-e2e='browse-close']")),
+                            EC.element_to_be_clickable((By.CSS_SELECTOR, "a[data-e2e='browse-user-avatar']")),
+                            EC.element_to_be_clickable((By.CSS_SELECTOR, "[class*='CloseButton']")),
+                            EC.element_to_be_clickable((By.CSS_SELECTOR, "button[aria-label='閉じる']")),
+                            EC.element_to_be_clickable((By.CSS_SELECTOR, "button[aria-label='Close']"))
+                        )
+                    )
+                    
+                    # JavaScriptでのクリックを試行
+                    self.driver.execute_script("arguments[0].click();", close_button)
+                    self._random_sleep(2.0, 3.0)
+                    
+                    # ユーザーページの動画一覧が表示されるか確認
+                    WebDriverWait(self.driver, 10).until(
+                        EC.presence_of_element_located((By.CSS_SELECTOR, "[data-e2e='user-post-item']"))
+                    )
+                    logger.debug("ユーザーページに戻りました")
+                    return
+                    
+                except Exception as e:
+                    logger.warning(f"閉じるボタンのクリックまたはユーザーページの表示確認に失敗: {str(e)}")
+                    
+                    # ボタンが見つからない場合やクリックに失敗した場合は、直接URLで移動
+                    if user_username:
+                        self.driver.get(f"{self.BASE_URL}/@{user_username}")
+                        self._random_sleep(3.0, 5.0)
+                        
+                        # ユーザーページの確認
+                        WebDriverWait(self.driver, 10).until(
+                            EC.presence_of_element_located((By.CSS_SELECTOR, "[data-e2e='user-page']"))
+                        )
+                        logger.debug(f"URLで直接ユーザーページ @{user_username} に移動しました")
+                        return
+                    else:
+                        # ブラウザの戻るボタンを使用
+                        self.driver.execute_script("window.history.go(-1)")
+                        self._random_sleep(2.0, 3.0)
+                        
+                        # ページが変わったことを確認
+                        if self.driver.current_url != current_url:
+                            logger.debug("ブラウザの戻るボタンでユーザーページに移動しました")
+                            return
+                        raise
+            
+            except Exception as e:
+                retry_count += 1
+                logger.warning(f"ユーザーページへの移動に失敗 (試行 {retry_count}/{max_retries}): {str(e)}")
+                
+                if retry_count >= max_retries:
+                    # 最終手段: 直接ユーザーページへアクセス
+                    if user_username:
+                        logger.warning(f"最大試行回数に達しました。直接ユーザーページへアクセスします: @{user_username}")
+                        self.navigate_to_user_page(user_username)
+                        return
+                    else:
+                        logger.error("ユーザーページへの移動に失敗し、ユーザー名も取得できませんでした")
+                        raise
+                
+                self._random_sleep(3.0, 5.0)
+        
+        logger.error("リトライ回数の上限に達しました")
 
     # 動画ページの「クリエイターの動画」タブに移動する
     # Condition: 動画ページが開かれていること
     def navigate_to_video_page_creator_videos_tab(self):
         logger.debug("動画ページの「クリエイターの動画」タブに移動中...")
         
-        # 2番目のタブ（クリエイターの動画）を待機して取得
-        creator_videos_tab = self.wait.until(
-            EC.presence_of_element_located((By.CSS_SELECTOR, "[class*='DivTabMenuContainer'] [class*='DivTabItemContainer']:nth-child(2) [class*='DivTabItem']"))
-        )
-        creator_videos_tab.click()
-        self._random_sleep(1.0, 2.0)
-        logger.debug("動画ページの「クリエイターの動画」タブに移動しました")
+        max_retries = 3
+        retry_count = 0
+        
+        while retry_count < max_retries:
+            try:
+                # 画面が確実に読み込まれるまで少し待機
+                self._random_sleep(2.0, 3.0)
+                
+                # 2番目のタブ（クリエイターの動画）を待機して取得
+                creator_videos_tab = self.wait.until(
+                    EC.element_to_be_clickable((By.CSS_SELECTOR, "[class*='DivTabMenuContainer'] [class*='DivTabItemContainer']:nth-child(2) [class*='DivTabItem']"))
+                )
+                
+                # JavaScriptを使用してクリック実行（より安定した方法）
+                self.driver.execute_script("arguments[0].click();", creator_videos_tab)
+                
+                # クリック後に少し待機
+                self._random_sleep(2.0, 3.0)
+                
+                # クリック成功を確認する要素を待機
+                self.wait.until(
+                    EC.presence_of_element_located((By.CSS_SELECTOR, "[class*='DivVideoListContainer']"))
+                )
+                
+                logger.debug("動画ページの「クリエイターの動画」タブに移動しました")
+                return
+                
+            except Exception as e:
+                retry_count += 1
+                logger.warning(f"クリエイターの動画タブへの移動に失敗 (試行 {retry_count}/{max_retries}): {str(e)}")
+                
+                if retry_count >= max_retries:
+                    logger.error("最大試行回数に達しました。エラーを再発生させます。")
+                    raise
+                
+                # ページを少しリフレッシュする
+                self.driver.execute_script("document.body.style.zoom='0.99'")
+                self.driver.execute_script("document.body.style.zoom='1'")
+                self._random_sleep(3.0, 5.0)
 
 
     # 動画ページの「クリエイターの動画」タブをスクロールする
