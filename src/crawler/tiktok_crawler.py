@@ -14,7 +14,7 @@ import os
 from ..database.models import CrawlerAccount, FavoriteUser, VideoHeavyRawData, VideoLightRawData
 from ..database.repositories import CrawlerAccountRepository, FavoriteUserRepository, VideoRepository
 from ..database.database import Database
-from .selenium_manager import SeleniumManager
+from .selenium_manager import SeleniumManager, MobileSeleniumManager
 from ..logger import setup_logger
 import grpc
 from google.cloud import pubsub_v1
@@ -183,7 +183,8 @@ class TikTokCrawler:
                  favorite_user_repo: FavoriteUserRepository,
                  video_repo: VideoRepository,
                  crawler_account_id: Optional[int] = None,
-                 sadcaptcha_api_key: Optional[str] = None):
+                 sadcaptcha_api_key: Optional[str] = None,
+                 device_type: str = "pc"):
         self.crawler_account_repo = crawler_account_repo
         self.favorite_user_repo = favorite_user_repo
         self.video_repo = video_repo
@@ -194,6 +195,7 @@ class TikTokCrawler:
         self.wait = None
         self.sadcaptcha_api_key = "fd31d51515ed18cadec7d4a522894997"
         self.login_restart_attempted = False        # ← 追加
+        self.device_type = device_type
 
     def __enter__(self):
         # クローラーアカウントを取得
@@ -206,10 +208,14 @@ class TikTokCrawler:
             if not self.crawler_account:
                 raise Exception("利用可能なクローラーアカウントがありません")
 
-        # Seleniumの設定
-        self.selenium_manager = SeleniumManager(self.crawler_account.proxy, self.sadcaptcha_api_key)
-        self.driver = self.selenium_manager.setup_driver()
-        self.wait = WebDriverWait(self.driver, 15)  # タイムアウトを15秒に変更
+        # デバイスタイプに応じてセットアップ
+        if self.device_type == "mobile":
+            self._setup_mobile_fingerprinter()
+        else:  # PC (デフォルト)
+            # Seleniumの設定
+            self.selenium_manager = SeleniumManager(self.crawler_account.proxy, self.sadcaptcha_api_key)
+            self.driver = self.selenium_manager.setup_driver()
+            self.wait = WebDriverWait(self.driver, 15)  # タイムアウトを15秒に変更
 
         # ログイン
         self._login()
@@ -1260,6 +1266,20 @@ class TikTokCrawler:
         
         logger.info(f"クロール対象のお気に入りユーザー{len(favorite_users)}件に対し{light_or_heavy}データのクロールを完了しました")
 
+    def _setup_mobile_fingerprinter(self):
+        """モバイル用のfingerprinterをセットアップする"""
+        logger.info("モバイル用fingerprinterをセットアップします...")
+        
+        # モバイルデバイスタイプでSeleniumManagerを初期化
+        self.selenium_manager = SeleniumManager(self.crawler_account.proxy, self.sadcaptcha_api_key, device_type="mobile")
+        
+        # ドライバーをセットアップ
+        self.driver = self.selenium_manager.setup_driver()
+        
+        # 待機時間を設定
+        self.wait = WebDriverWait(self.driver, 15)
+        
+        logger.info("モバイル用fingerprinterのセットアップが完了しました")
 
 
 def main():
@@ -1296,6 +1316,12 @@ def main():
         "--recrawl",
         action="store_true",
         help="既にクロール済みの動画を再クロールする (デフォルト: False)"
+    )
+    parser.add_argument(
+        "--device-type",
+        choices=["pc", "mobile"],
+        default="pc",
+        help="デバイスタイプ (デフォルト: pc)"
     )
     
     args = parser.parse_args()

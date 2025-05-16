@@ -17,11 +17,13 @@ import tempfile, shutil, os, time, logging
 logger = setup_logger(__name__)
 
 class SeleniumManager:
-    def __init__(self, proxy: str = None, sadcaptcha_api_key: str = None):
+    def __init__(self, proxy: str = None, sadcaptcha_api_key: str = None, device_type: str = "pc"):
         self.driver = None
         self.solver = None  
         self.proxy = proxy
         self.sadcaptcha_api_key = sadcaptcha_api_key
+        self.device_type = device_type
+        logger.info(f"SeleniumManager初期化: device_type={device_type}")
 
     def setup_driver(self):
         try:
@@ -34,88 +36,163 @@ class SeleniumManager:
             # その他の設定
             options.add_argument(f"--user-data-dir={profile_dir}")
             options.add_argument('--no-sandbox')
-            options.add_argument('--use-angle=gl')
-            options.add_argument('--enable-features=Vulkan,VaapiVideoDecoder')
-            options.add_argument('--disable-vulkan-surface')
-            options.add_argument('--enable-gpu-rasterization')
-            options.add_argument('--enable-zero-copy')
-            options.add_argument('--ignore-gpu-blocklist')
-            options.add_argument('--enable-hardware-overlays')
             options.add_argument('--mute-audio')
-            options.add_argument('--start-maximized')
-            extra_flags = [
-                # JS タイマー／Renderer を背景でも止めない
-                '--disable-background-timer-throttling',
-                '--disable-renderer-backgrounding',
-                '--disable-backgrounding-occluded-windows',
+            
+            # デバイスタイプに応じた設定
+            if self.device_type == "mobile":
+                logger.info("モバイル用の設定を適用します")
+                # モバイル用のユーザーエージェント
+                mobile_user_agent = "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.0 Mobile/15E148 Safari/604.1"
+                options.add_argument(f'--user-agent={mobile_user_agent}')
+                options.add_argument('--window-size=390,844')  # iPhone 13 サイズ
+                
+                # モバイル用の追加フラグ
+                mobile_flags = [
+                    '--disable-background-timer-throttling',
+                    '--disable-renderer-backgrounding',
+                    '--disable-backgrounding-occluded-windows',
+                    '--disable-tab-discarding',
+                    '--battery-saver-mode=disable',
+                    '--autoplay-policy=no-user-gesture-required',
+                    '--touch-events=enabled',
+                    '--enable-viewport',
+                    '--enable-features=TouchpadOverscrollHistoryNavigation'
+                ]
+                
+                for f in mobile_flags:
+                    options.add_argument(f)
+            else:
+                logger.info("PC用の設定を適用します")
+                options.add_argument('--use-angle=gl')
+                options.add_argument('--enable-features=Vulkan,VaapiVideoDecoder')
+                options.add_argument('--disable-vulkan-surface')
+                options.add_argument('--enable-gpu-rasterization')
+                options.add_argument('--enable-zero-copy')
+                options.add_argument('--ignore-gpu-blocklist')
+                options.add_argument('--enable-hardware-overlays')
+                options.add_argument('--start-maximized')
+                
+                # PC用の追加フラグ
+                extra_flags = [
+                    # JS タイマー／Renderer を背景でも止めない
+                    '--disable-background-timer-throttling',
+                    '--disable-renderer-backgrounding',
+                    '--disable-backgrounding-occluded-windows',
 
-                # 自動タブ破棄（メモリ不足時にプロセス kill）の無効化
-                '--disable-tab-discarding',
+                    # 自動タブ破棄（メモリ不足時にプロセス kill）の無効化
+                    '--disable-tab-discarding',
 
-                # バッテリーセーバーや Energy Saver モードを無効化
-                '--battery-saver-mode=disable',
+                    # バッテリーセーバーや Energy Saver モードを無効化
+                    '--battery-saver-mode=disable',
 
-                # オートプレイ規制を緩和（音付きでもユーザー操作不要）
-                '--autoplay-policy=no-user-gesture-required',
+                    # オートプレイ規制を緩和（音付きでもユーザー操作不要）
+                    '--autoplay-policy=no-user-gesture-required',
 
-                # Chromium “features” として実装された追加抑制を止める
-                '--disable-features='
-                'CalculateBackgroundVideoPlaybackMinFrameRate,'
-                'PauseBackgroundTabsMediaToggle,'
-                'IntensiveWakeUpThrottling'
-            ]
-            for f in extra_flags:
-                options.add_argument(f)
+                    # Chromium "features" として実装された追加抑制を止める
+                    '--disable-features='
+                    'CalculateBackgroundVideoPlaybackMinFrameRate,'
+                    'PauseBackgroundTabsMediaToggle,'
+                    'IntensiveWakeUpThrottling'
+                ]
+                for f in extra_flags:
+                    options.add_argument(f)
+
+            # 以下のオプションを追加することを推奨
+            options.add_experimental_option("excludeSwitches", ["enable-automation"])
+            options.add_experimental_option("useAutomationExtension", False)
+            options.add_argument("--disable-blink-features=AutomationControlled")
 
             self.driver = uc.Chrome(options=options)
 
-            self.driver.execute_cdp_cmd(
-                "Emulation.setDeviceMetricsOverride",
-                {
-                    "width": 1920,
-                    "height": 1080,
-                    "deviceScaleFactor": 1,
-                    "mobile": False,          # ← これが最重要
-                    "screenWidth": 1920,      # ↓ 省略可だが揃えておくと安全
-                    "screenHeight": 1080,
-                    "positionX": 0,
-                    "positionY": 0,
-                },
-            )    
+            # デバイスタイプに応じたエミュレーション設定
+            if self.device_type == "mobile":
+                # モバイルエミュレーション設定
+                self.driver.execute_cdp_cmd(
+                    "Emulation.setDeviceMetricsOverride",
+                    {
+                        "width": 390,
+                        "height": 844,
+                        "deviceScaleFactor": 3.0,  # Retinaディスプレイ
+                        "mobile": True,  # モバイルとして設定
+                        "screenWidth": 390,
+                        "screenHeight": 844,
+                        "positionX": 0,
+                        "positionY": 0,
+                    },
+                )
+                
+                # タッチイベントの有効化
+                self.driver.execute_cdp_cmd(
+                    "Emulation.setTouchEmulationEnabled",
+                    {
+                        "enabled": True,
+                        "maxTouchPoints": 5  # マルチタッチ対応
+                    }
+                )
+            else:
+                # PC用のエミュレーション設定
+                self.driver.execute_cdp_cmd(
+                    "Emulation.setDeviceMetricsOverride",
+                    {
+                        "width": 1920,
+                        "height": 1080,
+                        "deviceScaleFactor": 1,
+                        "mobile": False,
+                        "screenWidth": 1920,
+                        "screenHeight": 1080,
+                        "positionX": 0,
+                        "positionY": 0,
+                    },
+                )    
 
             if self.sadcaptcha_api_key:
                 # CAPTCHA Solver使用時
-                logger.info("CAPTCHA Solver付きのドライバーを作成します")
+                device_str = "モバイル用" if self.device_type == "mobile" else ""
+                logger.info(f"{device_str}CAPTCHA Solver付きのドライバーを作成します")
                 self.solver = SeleniumSolver(
                     self.driver,
                     self.sadcaptcha_api_key  # オプションを渡す
                 )
+            
+            # デバイスタイプに応じたstealth設定
+            if self.device_type == "mobile":
+                stealth(
+                    self.driver,
+                    languages=["ja-JP", "ja"],
+                    vendor="Apple Inc.",
+                    platform="iPhone",
+                    webgl_vendor="Apple Inc.",
+                    renderer="Apple GPU",
+                    fix_hairline=True,
+                )
             else:
-                # 通常のSeleniumドライバーを使用
-                service = Service()
-                self.driver = webdriver.Chrome(service=service, options=options)
+                stealth(
+                    self.driver,
+                    languages=["ja-JP", "ja"],
+                    vendor="Google Inc.",
+                    platform="Win32",
+                    webgl_vendor="WebKit",
+                    renderer="WebKit WebGL",
+                    fix_hairline=True,
+                )
             
-            # 共通の設定
-            stealth(
-                self.driver,
-                languages=["ja-JP", "ja"],
-                vendor="Google Inc.",
-                platform="Win32",
-                webgl_vendor="WebKit",
-                renderer="WebKit WebGL",
-                fix_hairline=True,
-            )
+            # より包括的なウェブドライバー検出回避
+            js_script = """
+            Object.defineProperty(navigator, 'webdriver', {get: () => undefined});
+            Object.defineProperty(navigator, 'plugins', {get: function() { return []; }});
+            Object.defineProperty(navigator, 'languages', {get: function() { return ['ja-JP', 'ja']; }});
+            Object.defineProperty(navigator, 'maxTouchPoints', {get: function() { return 5; }});
+            window.chrome = undefined;
+            """
+            self.driver.execute_script(js_script)
             
-            # WebDriver検出防止のJavaScript
-            self.driver.execute_script(
-                "Object.defineProperty(navigator, 'webdriver', {get: () => undefined})"
-            )
-            
-            logger.info("Chromeドライバーの設定が完了しました")
+            device_str = "モバイル用" if self.device_type == "mobile" else ""
+            logger.info(f"{device_str}Chromeドライバーの設定が完了しました")
             return self.driver
         
         except Exception as e:
-            logger.error(f"Chromeドライバーの設定中にエラーが発生しました: {e}")
+            device_str = "モバイル用" if self.device_type == "mobile" else ""
+            logger.error(f"{device_str}Chromeドライバーの設定中にエラーが発生しました: {e}")
             raise
 
     def check_and_solve_captcha(self):
