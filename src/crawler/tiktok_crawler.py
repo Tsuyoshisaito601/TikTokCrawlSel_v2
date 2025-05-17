@@ -660,7 +660,7 @@ class TikTokCrawler:
         user_nickname = self.driver.find_element(By.CSS_SELECTOR, "[data-e2e='browser-nickname'],[data-e2e='user-subtitle']").text
         video_title = self.driver.find_element(By.CSS_SELECTOR, "[data-e2e='browse-video-desc'],[data-e2e='video-desc']").text
         post_time_element = self.driver.find_element(By.CSS_SELECTOR, "a[class*='StyledAuthorAnchor'], [data-e2e='browser-nickname'] span:last-child")
-        audio_url = self.driver.find_element(By.CSS_SELECTOR, "[data-e2e='browse-music'] a,[data-e2e='video-music']").get_attribute("href")
+        # audio_url = self.driver.find_element(By.CSS_SELECTOR, "[data-e2e='browse-music'] a,[data-e2e='video-music']").get_attribute("href")
         try:
             # まず新しい形式を試す
             audio_element = self.driver.find_element(By.CSS_SELECTOR, 
@@ -701,7 +701,6 @@ class TikTokCrawler:
             "user_nickname": user_nickname,
             "video_title": video_title,
             "post_time_text": post_time_text,
-            "audio_url": audio_url,
             "audio_info_text": audio_info_text,
             "like_count_text": like_count_text,
             "comment_count_text": comment_count_text,
@@ -716,7 +715,6 @@ class TikTokCrawler:
         user_nickname = self.driver.find_element(By.CSS_SELECTOR, "[data-e2e='browser-nickname']").text
         video_title = self.driver.find_element(By.CSS_SELECTOR, "[data-e2e='browse-video-desc']").text
         post_time_text = self.driver.find_element(By.CSS_SELECTOR, "[data-e2e='browser-nickname'] span:last-child").text
-        audio_url = self.driver.find_element(By.CSS_SELECTOR, "[data-e2e='browse-music'] a").get_attribute("href")
         audio_info_text = self.driver.find_element(By.CSS_SELECTOR, "[data-e2e='browse-music'] .css-pvx3oa-DivMusicText").text
         like_count_text = self.driver.find_element(By.CSS_SELECTOR, "strong[data-e2e='like-count']").text
         comment_count_text = self.driver.find_element(By.CSS_SELECTOR, "strong[data-e2e='comment-count']").text
@@ -730,7 +728,6 @@ class TikTokCrawler:
             "user_nickname": user_nickname,
             "video_title": video_title,
             "post_time_text": post_time_text,
-            "audio_url": audio_url,
             "audio_info_text": audio_info_text,
             "like_count_text": like_count_text,
             "comment_count_text": comment_count_text,
@@ -1009,7 +1006,6 @@ class TikTokCrawler:
             video_title=heavy_data["video_title"],
             post_time_text=heavy_data.get("post_time_text"),
             post_time=post_time,
-            audio_url=heavy_data.get("audio_url"),
             audio_info_text=heavy_data.get("audio_info_text"),
             audio_id=None,  # ここでは取得できない(できるかも)
             audio_title=audio_title,
