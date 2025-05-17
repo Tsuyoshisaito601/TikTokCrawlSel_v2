@@ -1,0 +1,28 @@
+2025-05-17 14:22:58,421 - __main__ - ERROR - 予期しないエラーが発生しました
+Traceback (most recent call last):
+  File "C:\Users\kyoto\OneDrive\ドキュメント\code\tik_api\venv\Lib\site-packages\mysql\connector\connection_cext.py", line 323, in _open_connection
+    self._cmysql.connect(**cnx_kwargs)
+_mysql_connector.MySQLInterfaceError: Access denied for user 'ODBC'@'localhost' (using password: NO)
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "D:\app_ssd\Crawlsel2\TikTokCrawlSel_v2\src\crawler\tiktok_crawler.py", line 1499, in <module>
+    main()
+  File "D:\app_ssd\Crawlsel2\TikTokCrawlSel_v2\src\crawler\tiktok_crawler.py", line 1473, in main
+    with Database() as db:
+  File "D:\app_ssd\Crawlsel2\TikTokCrawlSel_v2\src\database\database.py", line 15, in __enter__
+    self.connect()
+  File "D:\app_ssd\Crawlsel2\TikTokCrawlSel_v2\src\database\database.py", line 24, in connect
+    self.connection = mysql.connector.connect(**self.config)
+                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\kyoto\OneDrive\ドキュメント\code\tik_api\venv\Lib\site-packages\mysql\connector\pooling.py", line 322, in connect
+    return CMySQLConnection(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\kyoto\OneDrive\ドキュメント\code\tik_api\venv\Lib\site-packages\mysql\connector\connection_cext.py", line 140, in __init__
+    self.connect(**kwargs)
+  File "C:\Users\kyoto\OneDrive\ドキュメント\code\tik_api\venv\Lib\site-packages\mysql\connector\abstracts.py", line 1363, in connect
+    self._open_connection()
+  File "C:\Users\kyoto\OneDrive\ドキュメント\code\tik_api\venv\Lib\site-packages\mysql\connector\connection_cext.py", line 328, in _open_connection
+    raise get_mysql_exception(
+mysql.connector.errors.ProgrammingError: 1045 (28000): Access denied for user 'ODBC'@'localhost' (using password: NO)

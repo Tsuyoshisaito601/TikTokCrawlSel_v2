@@ -1,0 +1,11 @@
+2025-05-17 14:41:28,051 - src.crawler.selenium_manager - INFO - SeleniumManager初期化: device_type=mobile
+2025-05-17 14:41:28,052 - src.crawler.selenium_manager - INFO - モバイル用の設定を適用します
+2025-05-17 14:41:30,488 - src.crawler.selenium_manager - INFO - モバイル用CAPTCHA Solver付きのドライバーを作成します
+2025-05-17 14:41:30,804 - src.crawler.selenium_manager - INFO - モバイル用Chromeドライバーの設定が完了しました
+2025-05-17 14:41:49,326 - src.crawler.selenium_manager - DEBUG - captcha_present=True
+2025-05-17 14:41:49,327 - src.crawler.selenium_manager - INFO - [1/10] CAPTCHA 解決を試行中…
+2025-05-17 14:41:56,495 - src.crawler.selenium_manager - DEBUG - solve_CaptchaType.ROTATE_V2() => None
+2025-05-17 14:41:56,539 - src.crawler.selenium_manager - INFO - CAPTCHA まだ残存。3s 待って再試行
+2025-05-17 14:41:59,541 - src.crawler.selenium_manager - INFO - [2/10] CAPTCHA 解決を試行中…
+2025-05-17 14:42:36,248 - src.crawler.selenium_manager - ERROR - CAPTCHA 解決中に例外が発生: Neither puzzle, shapes, or rotate captcha was present.
+2025-05-17 14:43:33,286 - src.crawler.selenium_manager - INFO - Chromeドライバーを終了しました

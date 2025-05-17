@@ -1,0 +1,1 @@
+2025-05-17 14:22:58,420 - src.database.database - ERROR - データベース接続エラー: 1045 (28000): Access denied for user 'ODBC'@'localhost' (using password: NO)

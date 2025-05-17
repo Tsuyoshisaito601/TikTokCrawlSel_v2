@@ -1,0 +1,97 @@
+2025-05-17 22:09:03,400 - __main__ - INFO - クロール用アカウントningshichui@gmail.comでTikTokにログイン中...
+2025-05-17 22:10:07,647 - __main__ - INFO - クロール用アカウントningshichui@gmail.comでTikTokへのログインに成功しました
+2025-05-17 22:10:07,658 - __main__ - INFO - クロール対象のお気に入りユーザー10件に対しbothデータのクロールを行います
+2025-05-17 22:10:07,662 - __main__ - INFO - ユーザー @nito_ninaritai_na のbothデータのクロールを開始
+2025-05-17 22:10:07,664 - __main__ - DEBUG - ユーザー @nito_ninaritai_na のページに移動中...
+2025-05-17 22:10:11,341 - __main__ - DEBUG - ユーザー @nito_ninaritai_na のページに移動しました
+2025-05-17 22:10:11,342 - __main__ - DEBUG - 動画の軽いデータの前半を取得中...
+2025-05-17 22:10:45,380 - __main__ - DEBUG - 100件の画像要素を目標にユーザーページをスクロールします...
+2025-05-17 22:10:46,872 - __main__ - DEBUG - 30件の画像要素を確認しました。
+2025-05-17 22:10:58,685 - __main__ - WARNING - 新しい画像要素のロードがタイムアウトしました。30件の画像要素を確認しました。もう1度だけスクロールを試みます。
+2025-05-17 22:11:00,576 - __main__ - DEBUG - 30件の画像要素を確認しました。
+2025-05-17 22:11:12,260 - __main__ - WARNING - 新しい画像要素のロードが2回続けてタイムアウトしました。30件の画像要素を確認しました。スクロールを中止します。
+Traceback (most recent call last):
+  File "D:\app_ssd\Crawlsel2\TikTokCrawlSel_v2\src\crawler\tiktok_crawler.py", line 445, in scroll_user_page
+    wait.until(lambda driver: len(driver.find_elements(By.CSS_SELECTOR, "div[data-e2e='user-post-item'],div[data-e2e='video-item']")) > current_items_count)
+  File "C:\Users\kyoto\OneDrive\ドキュメント\code\tik_api\venv\Lib\site-packages\selenium\webdriver\support\wait.py", line 105, in until
+    raise TimeoutException(message, screen, stacktrace)
+selenium.common.exceptions.TimeoutException: Message: 
+
+2025-05-17 22:11:12,279 - __main__ - DEBUG - 動画の軽いデータの前半を求めて30本の動画要素を走査します
+2025-05-17 22:11:13,348 - __main__ - DEBUG - 動画の軽いデータの前半を取得しました: 30件
+2025-05-17 22:11:13,349 - __main__ - DEBUG - ユーザー @nito_ninaritai_na のlast_crawledを更新します
+2025-05-17 22:11:13,366 - __main__ - INFO - ユーザー @nito_ninaritai_na の軽いデータののクロールを開始
+2025-05-17 22:11:13,367 - __main__ - DEBUG - 動画の軽いデータをパースおよび保存中...
+2025-05-17 22:11:13,369 - __main__ - DEBUG - light_like_datasをoutput\debug\light_like_datas_20250517_221113.csvに出力しました: 30件
+2025-05-17 22:11:13,573 - __main__ - INFO - 動画の軽いデータをパースおよび保存しました: 30件
+2025-05-17 22:11:13,575 - __main__ - INFO - バッチの軽いデータのクロールを完了しました。重いデータのクロールを開始します。
+2025-05-17 22:11:13,576 - __main__ - DEBUG - 動画ページに移動中...: https://www.tiktok.com/@nito_ninaritai_na/video/7505359397061807378
+2025-05-17 22:11:17,410 - __main__ - DEBUG - 動画ページに移動しました: https://www.tiktok.com/@nito_ninaritai_na/video/7505359397061807378
+2025-05-17 22:11:17,411 - __main__ - DEBUG - 動画の重いデータを取得中...
+2025-05-17 22:11:17,565 - __main__ - DEBUG - 動画の重いデータを取得しました: https://www.tiktok.com/@nito_ninaritai_na/video/7505359397061807378
+2025-05-17 22:11:17,575 - __main__ - DEBUG - 動画の重いデータをパースおよび保存中...: https://www.tiktok.com/@nito_ninaritai_na/video/7505359397061807378
+2025-05-17 22:11:17,613 - __main__ - INFO - 動画の重いデータをパースおよび保存しました: https://www.tiktok.com/@nito_ninaritai_na/video/7505359397061807378
+2025-05-17 22:11:17,825 - __main__ - INFO - Pub/Subメッセージを送信しました。Message ID: 3
+2025-05-17 22:11:30,005 - __main__ - DEBUG - 動画ページの閉じるボタンをクリックしてユーザーページに戻ります...
+2025-05-17 22:11:32,787 - __main__ - DEBUG - ユーザーページに戻りました
+2025-05-17 22:11:32,791 - __main__ - DEBUG - 動画ページに移動中...: https://www.tiktok.com/@nito_ninaritai_na/video/7504983565172493575
+2025-05-17 22:11:37,339 - __main__ - DEBUG - 動画ページに移動しました: https://www.tiktok.com/@nito_ninaritai_na/video/7504983565172493575
+2025-05-17 22:11:37,340 - __main__ - DEBUG - 動画の重いデータを取得中...
+2025-05-17 22:11:37,598 - __main__ - ERROR - 動画 https://www.tiktok.com/@nito_ninaritai_na/video/7504983565172493575 の重いデータのクロール中に失敗。スキップします
+Traceback (most recent call last):
+  File "D:\app_ssd\Crawlsel2\TikTokCrawlSel_v2\src\crawler\tiktok_crawler.py", line 1294, in crawl_user
+    heavy_data = self.get_video_heavy_data_from_video_page()
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\app_ssd\Crawlsel2\TikTokCrawlSel_v2\src\crawler\tiktok_crawler.py", line 682, in get_video_heavy_data_from_video_page
+    full_text = post_time_element.text
+                ^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\kyoto\OneDrive\ドキュメント\code\tik_api\venv\Lib\site-packages\selenium\webdriver\remote\webelement.py", line 90, in text
+    return self._execute(Command.GET_ELEMENT_TEXT)["value"]
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\kyoto\OneDrive\ドキュメント\code\tik_api\venv\Lib\site-packages\selenium\webdriver\remote\webelement.py", line 395, in _execute
+    return self._parent.execute(command, params)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\kyoto\OneDrive\ドキュメント\code\tik_api\venv\Lib\site-packages\selenium\webdriver\remote\webdriver.py", line 347, in execute
+    self.error_handler.check_response(response)
+  File "C:\Users\kyoto\OneDrive\ドキュメント\code\tik_api\venv\Lib\site-packages\selenium\webdriver\remote\errorhandler.py", line 229, in check_response
+    raise exception_class(message, screen, stacktrace)
+selenium.common.exceptions.StaleElementReferenceException: Message: stale element reference: stale element not found in the current frame
+  (Session info: chrome=136.0.7103.93); For documentation on this error, please visit: https://www.selenium.dev/documentation/webdriver/troubleshooting/errors#stale-element-reference-exception
+Stacktrace:
+	GetHandleVerifier [0x0050FC83+61635]
+	GetHandleVerifier [0x0050FCC4+61700]
+	(No symbol) [0x003305D3]
+	(No symbol) [0x00336DD0]
+	(No symbol) [0x003390CA]
+	(No symbol) [0x00339147]
+	(No symbol) [0x003736BE]
+	(No symbol) [0x0039D29C]
+	(No symbol) [0x0036E034]
+	(No symbol) [0x0039D514]
+	(No symbol) [0x003BE61B]
+	(No symbol) [0x0039D096]
+	(No symbol) [0x0036C840]
+	(No symbol) [0x0036D6A4]
+	GetHandleVerifier [0x007945A3+2701795]
+	GetHandleVerifier [0x0078FD26+2683238]
+	GetHandleVerifier [0x007AAA6E+2793134]
+	GetHandleVerifier [0x00526945+155013]
+	GetHandleVerifier [0x0052D02D+181357]
+	GetHandleVerifier [0x005174D8+92440]
+	GetHandleVerifier [0x00517680+92864]
+	GetHandleVerifier [0x00502070+5296]
+	BaseThreadInitThunk [0x759B5D49+25]
+	RtlInitializeExceptionChain [0x7727D03B+107]
+	RtlGetAppContainerNamedObjectPath [0x7727CFC1+561]
+
+2025-05-17 22:11:37,666 - __main__ - DEBUG - 動画ページの閉じるボタンをクリックしてユーザーページに戻ります...
+2025-05-17 22:11:39,970 - __main__ - DEBUG - ユーザーページに戻りました
+2025-05-17 22:11:39,971 - __main__ - DEBUG - 動画ページに移動中...: https://www.tiktok.com/@nito_ninaritai_na/video/7504611671143353608
+2025-05-17 22:11:44,953 - __main__ - DEBUG - 動画ページに移動しました: https://www.tiktok.com/@nito_ninaritai_na/video/7504611671143353608
+2025-05-17 22:11:44,955 - __main__ - DEBUG - 動画の重いデータを取得中...
+2025-05-17 22:11:45,139 - __main__ - DEBUG - 動画の重いデータを取得しました: https://www.tiktok.com/@nito_ninaritai_na/video/7504611671143353608
+2025-05-17 22:11:45,140 - __main__ - DEBUG - 動画の重いデータをパースおよび保存中...: https://www.tiktok.com/@nito_ninaritai_na/video/7504611671143353608
+2025-05-17 22:11:45,150 - __main__ - INFO - 動画の重いデータをパースおよび保存しました: https://www.tiktok.com/@nito_ninaritai_na/video/7504611671143353608
+2025-05-17 22:11:45,175 - __main__ - INFO - Pub/Subメッセージを送信しました。Message ID: 4
+2025-05-17 22:11:51,862 - __main__ - DEBUG - 動画ページの閉じるボタンをクリックしてユーザーページに戻ります...
+2025-05-17 22:11:58,010 - __main__ - INFO - ユーザーにより中断されました

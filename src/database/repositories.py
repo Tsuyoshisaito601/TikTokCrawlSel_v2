@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import List, Optional, Set, Dict
 from .database import Database
-from .models import CrawlerAccount, FavoriteUser, VideoHeavyRawData, VideoLightRawData
+from .models import CrawlerAccount, FavoriteUser, VideoHeavyRawData, VideoLightRawData, VideoPlayCountRawData
 from ..logger import setup_logger
 
 logger = setup_logger(__name__)
@@ -13,7 +13,7 @@ class CrawlerAccountRepository:
     def get_an_available_crawler_account(self) -> Optional[CrawlerAccount]:
         """利用可能なクローラーアカウントを1つ取得(使ってない順)"""
         query = """
-            SELECT id, username, password, proxy, is_alive, last_crawled_at
+            SELECT id, username, password, proxy, is_alive, last_crawled_at,video_crawler_id
             FROM crawler_accounts
             WHERE is_alive = TRUE
             ORDER BY 
@@ -37,7 +37,8 @@ class CrawlerAccountRepository:
             password=row[2],
             proxy=row[3],
             is_alive=row[4],
-            last_crawled_at=row[5]
+            last_crawled_at=row[5],
+            video_crawler_id=row[6]
         )
 
     def update_crawler_account_last_crawled(self, crawler_account_id: int, last_crawled_at: datetime):
@@ -59,7 +60,7 @@ class CrawlerAccountRepository:
             CrawlerAccountオブジェクト。見つからない場合はNone。
         """
         query = """
-            SELECT id, username, password, proxy, is_alive, last_crawled_at
+            SELECT id, username, password, proxy, is_alive, last_crawled_at,video_crawler_id
             FROM crawler_accounts
             WHERE id = %s
             AND is_alive = TRUE
@@ -78,9 +79,11 @@ class CrawlerAccountRepository:
             password=row[2],
             proxy=row[3],
             is_alive=row[4],
-            last_crawled_at=row[5]
+            last_crawled_at=row[5],
+            video_crawler_id=row[6]
         )
 
+    
 
 class FavoriteUserRepository:
     def __init__(self, db: Database):
@@ -90,7 +93,8 @@ class FavoriteUserRepository:
         """クロール対象のお気に入りアカウントを取得"""
         query = """
             SELECT id, favorite_user_username, crawler_account_id,
-                   favorite_user_is_alive, crawl_priority, last_crawled_at, is_new_account
+                   favorite_user_is_alive, crawl_priority, last_crawled_at, is_new_account,
+                   video_crawler_id
             FROM account_list
             WHERE crawler_account_id = %s
             AND favorite_user_is_alive = TRUE
@@ -115,10 +119,49 @@ class FavoriteUserRepository:
                 favorite_user_is_alive=row[3],
                 crawl_priority=row[4],
                 last_crawled_at=row[5],
-                is_new_account=row[6]
+                is_new_account=row[6],
+                video_crawler_id=row[7]
             )
             for row in rows
         ]
+    
+    def get_favorite_users_by_video_crawler_id(self, video_crawler_id: int, limit: int = 1000) -> List[FavoriteUser]:
+        """クロール対象のお気に入りアカウントを取得"""
+        query = """
+            SELECT id, favorite_user_username, crawler_account_id,
+                   favorite_user_is_alive, crawl_priority, last_crawled_at, is_new_account,
+                   video_crawler_id
+            FROM account_list
+            WHERE video_crawler_id = %s
+            AND favorite_user_is_alive = TRUE
+            ORDER BY 
+                CASE 
+                    WHEN last_crawled_at IS NULL THEN 1
+                    ELSE 0
+                END DESC,
+                crawl_priority DESC,
+                last_crawled_at ASC
+            LIMIT %s
+        """
+        cursor = self.db.execute_query(query, (video_crawler_id, limit))
+        rows = cursor.fetchall()
+        cursor.close()
+
+        return [
+            FavoriteUser(
+                id=row[0],
+                favorite_user_username=row[1],
+                crawler_account_id=row[2],
+                favorite_user_is_alive=row[3],
+                crawl_priority=row[4],
+                last_crawled_at=row[5],
+                is_new_account=row[6],
+                video_crawler_id=row[7]
+            )
+            for row in rows
+        ]
+
+    
 
     def update_favorite_user_last_crawled(self, username: str, last_crawled_at: datetime):
         """お気に入りアカウントの最終クロール時間を更新"""
@@ -169,13 +212,12 @@ class VideoRepository:
                 video_id, video_url, video_thumbnail_url, video_title,
                 user_username, user_nickname, post_time_text, post_time,
                 audio_url, audio_info_text, audio_id, audio_title, audio_author_name,
-                play_count_text, play_count, like_count_text, like_count,
+                like_count_text, like_count,
                 comment_count_text, comment_count, collect_count_text, collect_count,
                 share_count_text, share_count, crawling_algorithm, crawled_at
             ) VALUES (
                 %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s,
-                %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s,
-                %s
+                %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s
             ) ON DUPLICATE KEY UPDATE
                 video_url = VALUES(video_url),
                 video_thumbnail_url = VALUES(video_thumbnail_url),
@@ -189,8 +231,6 @@ class VideoRepository:
                 audio_id = VALUES(audio_id),
                 audio_title = VALUES(audio_title),
                 audio_author_name = VALUES(audio_author_name),
-                play_count_text = VALUES(play_count_text),
-                play_count = VALUES(play_count),
                 like_count_text = VALUES(like_count_text),
                 like_count = VALUES(like_count),
                 comment_count_text = VALUES(comment_count_text),
@@ -206,7 +246,7 @@ class VideoRepository:
             data.video_id, data.video_url, data.video_thumbnail_url, data.video_title,
             data.user_username, data.user_nickname, data.post_time_text, data.post_time,
             data.audio_url, data.audio_info_text, data.audio_id, data.audio_title, data.audio_author_name,
-            data.play_count_text, data.play_count, data.like_count_text, data.like_count,
+            data.like_count_text, data.like_count,
             data.comment_count_text, data.comment_count, data.collect_count_text, data.collect_count,
             data.share_count_text, data.share_count, data.crawling_algorithm, data.crawled_at
         ))
@@ -217,18 +257,16 @@ class VideoRepository:
             INSERT INTO video_light_raw_data (
                 video_url, video_id, user_username,
                 video_thumbnail_url, video_alt_info_text,
-                play_count_text, play_count, like_count_text, like_count,
+                like_count_text, like_count,
                 crawling_algorithm, crawled_at
             ) VALUES (
-                %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s
+                %s, %s, %s, %s, %s, %s, %s, %s, %s
             ) ON DUPLICATE KEY UPDATE
                 video_url = VALUES(video_url),
                 video_id = VALUES(video_id),
                 user_username = VALUES(user_username),
                 video_thumbnail_url = VALUES(video_thumbnail_url),
                 video_alt_info_text = VALUES(video_alt_info_text),
-                play_count_text = VALUES(play_count_text),
-                play_count = VALUES(play_count),
                 like_count_text = VALUES(like_count_text),
                 like_count = VALUES(like_count),
                 crawling_algorithm = VALUES(crawling_algorithm),
@@ -237,9 +275,28 @@ class VideoRepository:
         self.db.execute_query(query, (
             data.video_url, data.video_id, data.user_username,
             data.video_thumbnail_url, data.video_alt_info_text,
-            data.play_count_text, data.play_count, data.like_count_text, data.like_count,
+            data.like_count_text, data.like_count,
             data.crawling_algorithm, data.crawled_at
         ))
+
+    def save_video_play_count_data(self, data: VideoPlayCountRawData):
+        """動画の再生数の軽いデータを保存"""
+        query = """
+            INSERT INTO video_play_count_raw_data (
+                video_url, video_id, user_username, play_count_text, play_count, crawling_algorithm, crawled_at
+            ) VALUES (
+                %s, %s, %s, %s, %s, %s, %s
+            ) ON DUPLICATE KEY UPDATE
+                play_count_text = VALUES(play_count_text),
+                play_count = VALUES(play_count),
+                crawling_algorithm = VALUES(crawling_algorithm),
+                crawled_at = VALUES(crawled_at)
+        """ 
+        self.db.execute_query(query, (
+            data.video_url, data.video_id, data.user_username, data.play_count_text, data.play_count,
+            data.crawling_algorithm, data.crawled_at
+        ))
+    
 
     def get_existing_heavy_data_video_ids(self, user_username: str) -> Set[str]:
         """指定されたユーザーの動画のうち重いデータを既に取ってあるものの動画IDの集合を取得"""
@@ -259,7 +316,7 @@ class VideoRepository:
             動画URLとサムネイルURLの辞書のリスト
         """
         query = """
-            SELECT video_url, video_thumbnail_url,play_count,video_alt_info_text
+            SELECT video_url, video_thumbnail_url,video_alt_info_text
             FROM video_light_raw_data
             WHERE user_username = %s
             AND needs_update = 1
@@ -272,8 +329,7 @@ class VideoRepository:
             {
                 "video_url": row[0],
                 "video_thumbnail_url": row[1],
-                "play_count": row[2],
-                "video_alt_info_text": row[3]
+                "video_alt_info_text": row[2]
             }
             for row in rows
         ]

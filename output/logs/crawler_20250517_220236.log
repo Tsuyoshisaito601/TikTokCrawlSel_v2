@@ -1,0 +1,48 @@
+2025-05-17 22:02:37,076 - src.crawler.selenium_manager - INFO - SeleniumManager初期化: device_type=pc
+2025-05-17 22:02:37,076 - src.crawler.selenium_manager - INFO - PC用の設定を適用します
+2025-05-17 22:02:40,064 - src.crawler.selenium_manager - INFO - CAPTCHA Solver付きのドライバーを作成します
+2025-05-17 22:02:40,142 - src.crawler.selenium_manager - INFO - Chromeドライバーの設定が完了しました
+2025-05-17 22:02:40,143 - __main__ - INFO - クロール用アカウントningshichui@gmail.comでTikTokにログイン中...
+2025-05-17 22:03:01,176 - src.crawler.selenium_manager - DEBUG - captcha_present=True
+2025-05-17 22:03:01,177 - src.crawler.selenium_manager - INFO - [1/10] CAPTCHA 解決を試行中…
+2025-05-17 22:03:05,841 - src.crawler.selenium_manager - DEBUG - solve_CaptchaType.ROTATE_V2() => None
+2025-05-17 22:03:05,873 - src.crawler.selenium_manager - INFO - CAPTCHA まだ残存。3s 待って再試行
+2025-05-17 22:03:08,875 - src.crawler.selenium_manager - INFO - [2/10] CAPTCHA 解決を試行中…
+2025-05-17 22:03:12,928 - src.crawler.selenium_manager - DEBUG - solve_CaptchaType.ROTATE_V2() => None
+2025-05-17 22:03:12,982 - src.crawler.selenium_manager - INFO - CAPTCHA まだ残存。3s 待って再試行
+2025-05-17 22:03:15,984 - src.crawler.selenium_manager - INFO - [3/10] CAPTCHA 解決を試行中…
+2025-05-17 22:03:53,600 - src.crawler.selenium_manager - ERROR - CAPTCHA 解決中に例外が発生: Neither puzzle, shapes, or rotate captcha was present.
+2025-05-17 22:03:53,618 - __main__ - INFO - クロール用アカウントningshichui@gmail.comでTikTokへのログインに成功しました
+2025-05-17 22:03:53,639 - __main__ - INFO - クロール対象のお気に入りユーザー10件に対しbothデータのクロールを行います
+2025-05-17 22:03:53,645 - __main__ - INFO - ユーザー @yagi.072 のbothデータのクロールを開始
+2025-05-17 22:03:53,646 - __main__ - DEBUG - ユーザー @yagi.072 のページに移動中...
+2025-05-17 22:04:01,175 - __main__ - DEBUG - ユーザー @yagi.072 のページに移動しました
+2025-05-17 22:04:01,175 - __main__ - DEBUG - 動画の軽いデータの前半を取得中...
+2025-05-17 22:04:31,505 - __main__ - DEBUG - 100件の画像要素を目標にユーザーページをスクロールします...
+2025-05-17 22:04:33,422 - __main__ - DEBUG - 50件の画像要素を確認しました。
+2025-05-17 22:04:38,329 - __main__ - DEBUG - 66件の画像要素を確認しました。
+2025-05-17 22:04:42,641 - __main__ - DEBUG - 98件の画像要素を確認しました。
+2025-05-17 22:04:48,225 - __main__ - DEBUG - 130件の画像要素を確認しました。
+2025-05-17 22:04:48,227 - __main__ - DEBUG - 目標以上の130件の画像要素を確認しました。スクロールを完了します。
+2025-05-17 22:04:48,244 - __main__ - DEBUG - 動画の軽いデータの前半を求めて100本の動画要素を走査します
+2025-05-17 22:04:52,352 - __main__ - DEBUG - 動画の軽いデータの前半を取得しました: 100件
+2025-05-17 22:04:52,353 - __main__ - DEBUG - ユーザー @yagi.072 のlast_crawledを更新します
+2025-05-17 22:04:52,366 - __main__ - INFO - ユーザー @yagi.072 の軽いデータののクロールを開始
+2025-05-17 22:04:52,369 - __main__ - DEBUG - 動画の軽いデータをパースおよび保存中...
+2025-05-17 22:04:52,376 - __main__ - DEBUG - light_like_datasをoutput\debug\light_like_datas_20250517_220452.csvに出力しました: 100件
+2025-05-17 22:04:53,166 - __main__ - ERROR - ユーザー @yagi.072 のbothデータのクロール中に失敗。スキップします
+Traceback (most recent call last):
+  File "D:\app_ssd\Crawlsel2\TikTokCrawlSel_v2\src\crawler\tiktok_crawler.py", line 1432, in crawl_favorite_users
+    self.crawl_user(user, light_or_heavy=light_or_heavy, max_videos_per_user=max_videos_per_user, recrawl=recrawl)
+  File "D:\app_ssd\Crawlsel2\TikTokCrawlSel_v2\src\crawler\tiktok_crawler.py", line 1260, in crawl_user
+    self.parse_and_save_video_light_datas(light_like_datas)
+  File "D:\app_ssd\Crawlsel2\TikTokCrawlSel_v2\src\crawler\tiktok_crawler.py", line 1118, in parse_and_save_video_light_datas
+    logger.info(f"動画の軽いデータをパースおよび保存しました: {len(light_like_datas)}件、うちplay_count_textが取れなかったもの: {play_count_not_found}件")
+                                                                                                                                 ^^^^^^^^^^^^^^^^^^^^
+NameError: name 'play_count_not_found' is not defined
+2025-05-17 22:04:53,170 - __main__ - INFO - ユーザー @nito_ninaritai_na のbothデータのクロールを開始
+2025-05-17 22:04:53,170 - __main__ - DEBUG - ユーザー @nito_ninaritai_na のページに移動中...
+2025-05-17 22:04:58,528 - __main__ - DEBUG - ユーザー @nito_ninaritai_na のページに移動しました
+2025-05-17 22:04:58,530 - __main__ - DEBUG - 動画の軽いデータの前半を取得中...
+2025-05-17 22:05:00,095 - src.crawler.selenium_manager - INFO - Chromeドライバーを終了しました
+2025-05-17 22:05:00,104 - __main__ - INFO - ユーザーにより中断されました

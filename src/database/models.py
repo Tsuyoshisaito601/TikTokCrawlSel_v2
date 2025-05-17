@@ -10,6 +10,7 @@ class CrawlerAccount:
     proxy: Optional[str] # 未設定かもしれないので
     is_alive: bool
     last_crawled_at: Optional[datetime] # 初めてかもしれないので
+    video_crawler_id: Optional[int] 
 
 @dataclass
 class FavoriteUser:
@@ -20,6 +21,7 @@ class FavoriteUser:
     crawl_priority: int
     last_crawled_at: Optional[datetime] 
     is_new_account: bool
+    video_crawler_id: Optional[int]
 
 @dataclass
 class VideoHeavyRawData:
@@ -37,8 +39,6 @@ class VideoHeavyRawData:
     audio_id: Optional[str] = None
     audio_title: Optional[str] = None
     audio_author_name: Optional[str] = None
-    play_count_text: str = ""
-    play_count: Optional[int] = None
     like_count_text: str = ""
     like_count: Optional[int] = None
     comment_count_text: Optional[str] = None
@@ -58,9 +58,18 @@ class VideoLightRawData:
     user_username: str = ""  # 動画を投稿したアカウントのユーザー名
     video_thumbnail_url: str = ""
     video_alt_info_text: str = ""  # {audio_author_name}の{audio_title}を使用して{user_nickname}が作成した{video_title}
-    play_count_text: Optional[str] = None
-    play_count: Optional[int] = None
     like_count_text: Optional[str] = None
     like_count: Optional[int] = None
+    crawling_algorithm: str = ""
+    crawled_at: datetime = datetime.now()
+
+@dataclass
+class VideoPlayCountRawData:
+    id: Optional[int] = None  # 自動採番
+    video_url: str = ""
+    video_id: str = ""  # TikTokの動画IDそのまま
+    user_username: str = ""  # 動画を投稿したアカウントのユーザー名
+    play_count_text: str = ""
+    play_count: Optional[int] = None
     crawling_algorithm: str = ""
     crawled_at: datetime = datetime.now()
