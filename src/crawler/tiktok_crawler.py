@@ -659,7 +659,7 @@ class TikTokCrawler:
         user_username = self.driver.find_element(By.CSS_SELECTOR, "[data-e2e='browse-username'],[data-e2e='user-title']").text
         user_nickname = self.driver.find_element(By.CSS_SELECTOR, "[data-e2e='browser-nickname'],[data-e2e='user-subtitle']").text
         video_title = self.driver.find_element(By.CSS_SELECTOR, "[data-e2e='browse-video-desc'],[data-e2e='video-desc']").text
-        post_time_element = self.driver.find_element(By.CSS_SELECTOR, "a[class*='StyledAuthorAnchor'], [data-e2e='video-author-uniqueid'], [data-e2e='browser-nickname'] span:last-child")
+        post_time_element = self.driver.find_element(By.CSS_SELECTOR, "[data-e2e='video-author-uniqueid'] span:last-child, [data-e2e='browser-nickname'] span:last-child")
         audio_url = self.driver.find_element(By.CSS_SELECTOR, "[data-e2e='browse-music'] a,[data-e2e='video-music']").get_attribute("href")
         try:
             # まず新しい形式を試す
