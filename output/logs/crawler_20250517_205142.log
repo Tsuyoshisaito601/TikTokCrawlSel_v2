@@ -1,0 +1,18 @@
+2025-05-17 20:51:45,453 - __main__ - INFO - クロール用アカウントningshichui@gmail.comでTikTokにログイン中...
+2025-05-17 20:52:47,894 - __main__ - INFO - クロール用アカウントningshichui@gmail.comでTikTokへのログインに成功しました
+2025-05-17 20:52:47,917 - __main__ - INFO - クロール対象のお気に入りユーザー10件に対しbothデータのクロールを行います
+2025-05-17 20:52:47,932 - __main__ - ERROR - 予期しないエラーが発生しました
+Traceback (most recent call last):
+  File "D:\app_ssd\Crawlsel2\TikTokCrawlSel_v2\src\crawler\tiktok_crawler.py", line 1545, in <module>
+    main()
+  File "D:\app_ssd\Crawlsel2\TikTokCrawlSel_v2\src\crawler\tiktok_crawler.py", line 1534, in main
+    crawler.crawl_favorite_users(
+  File "D:\app_ssd\Crawlsel2\TikTokCrawlSel_v2\src\crawler\tiktok_crawler.py", line 1425, in crawl_favorite_users
+    favorite_users = self.favorite_user_repo.get_favorite_users(
+                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\app_ssd\Crawlsel2\TikTokCrawlSel_v2\src\database\repositories.py", line 113, in get_favorite_users
+    return [
+           ^
+  File "D:\app_ssd\Crawlsel2\TikTokCrawlSel_v2\src\database\repositories.py", line 114, in <listcomp>
+    FavoriteUser(
+TypeError: FavoriteUser.__init__() missing 1 required positional argument: 'video_crawler_id'

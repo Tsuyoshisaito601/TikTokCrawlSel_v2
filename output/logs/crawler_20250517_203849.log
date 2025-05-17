@@ -1,0 +1,41 @@
+2025-05-17 20:38:49,267 - __main__ - INFO - モバイル用fingerprinterをセットアップします...
+2025-05-17 20:38:52,279 - __main__ - INFO - モバイル用fingerprinterのセットアップが完了しました
+2025-05-17 20:38:52,280 - __main__ - INFO - クロール用アカウントharuto_tanaka@isle-inc.comでTikTokにログイン中...
+2025-05-17 20:39:52,997 - __main__ - INFO - クロール用アカウントharuto_tanaka@isle-inc.comでTikTokへのログインに成功しました
+2025-05-17 20:39:53,043 - __main__ - INFO - クロール対象のお気に入りユーザー1000件に対しbothデータのクロールを行います
+2025-05-17 20:39:53,100 - __main__ - INFO - ユーザー @yurileeeee の軽いデータのクロールを開始
+2025-05-17 20:39:53,100 - __main__ - DEBUG - ユーザー @yurileeeee のページに移動中...
+2025-05-17 20:39:58,068 - __main__ - DEBUG - ユーザー @yurileeeee のページに移動しました
+2025-05-17 20:39:58,068 - __main__ - DEBUG - 動画の再生数の軽いデータの前半を取得中...
+2025-05-17 20:40:16,179 - __main__ - DEBUG - 100件の画像要素を目標にユーザーページをスクロールします...
+2025-05-17 20:40:17,767 - __main__ - DEBUG - 24件の画像要素を確認しました。
+2025-05-17 20:40:28,612 - __main__ - WARNING - 新しい画像要素のロードがタイムアウトしました。24件の画像要素を確認しました。もう1度だけスクロールを試みます。
+2025-05-17 20:40:30,196 - __main__ - DEBUG - 24件の画像要素を確認しました。
+2025-05-17 20:40:41,067 - __main__ - WARNING - 新しい画像要素のロードが2回続けてタイムアウトしました。24件の画像要素を確認しました。スクロールを中止します。
+Traceback (most recent call last):
+  File "D:\app_ssd\Crawlsel2\TikTokCrawlSel_v2\src\crawler\tiktok_crawler.py", line 445, in scroll_user_page
+    wait.until(lambda driver: len(driver.find_elements(By.CSS_SELECTOR, "div[data-e2e='user-post-item'],div[data-e2e='video-item']")) > current_items_count)
+  File "C:\Users\kyoto\OneDrive\ドキュメント\code\tik_api\venv\Lib\site-packages\selenium\webdriver\support\wait.py", line 105, in until
+    raise TimeoutException(message, screen, stacktrace)
+selenium.common.exceptions.TimeoutException: Message: 
+
+2025-05-17 20:40:41,092 - __main__ - DEBUG - 動画の再生数を求めて24本の動画要素を走査します
+2025-05-17 20:40:41,675 - __main__ - DEBUG - 動画の再生数を取得しました: 24件
+2025-05-17 20:40:41,675 - __main__ - INFO - ユーザー @yurileeeee の再生数の取得が完了
+2025-05-17 20:40:41,675 - __main__ - DEBUG - 動画の再生数の軽いデータをパースおよび保存中...
+2025-05-17 20:40:41,936 - __main__ - INFO - 動画の再生数の軽いデータをパースおよび保存しました: 24件
+2025-05-17 20:40:41,982 - __main__ - ERROR - ユーザー @yurileeeee の再生数データのクロール中に失敗。スキップします
+Traceback (most recent call last):
+  File "D:\app_ssd\Crawlsel2\TikTokCrawlSel_v2\src\crawler\tiktok_crawler.py", line 1418, in crawl_favorite_users
+    self.crawl_play_count(user,max_videos_per_user=max_videos_per_user)
+  File "D:\app_ssd\Crawlsel2\TikTokCrawlSel_v2\src\crawler\tiktok_crawler.py", line 1455, in crawl_play_count
+    self.parse_and_save_play_count_datas(light_play_datas)
+  File "D:\app_ssd\Crawlsel2\TikTokCrawlSel_v2\src\crawler\tiktok_crawler.py", line 1148, in parse_and_save_play_count_datas
+    "play_count": play_data["play_count"]
+                  ~~~~~~~~~^^^^^^^^^^^^^^
+KeyError: 'play_count'
+2025-05-17 20:40:41,983 - __main__ - INFO - ユーザー @kazugurashi の軽いデータのクロールを開始
+2025-05-17 20:40:41,983 - __main__ - DEBUG - ユーザー @kazugurashi のページに移動中...
+2025-05-17 20:40:45,720 - __main__ - DEBUG - ユーザー @kazugurashi のページに移動しました
+2025-05-17 20:40:45,723 - __main__ - DEBUG - 動画の再生数の軽いデータの前半を取得中...
+2025-05-17 20:40:46,172 - __main__ - INFO - ユーザーにより中断されました

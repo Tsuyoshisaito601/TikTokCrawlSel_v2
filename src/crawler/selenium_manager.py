@@ -98,8 +98,6 @@ class SeleniumManager:
                     options.add_argument(f)
 
             # 以下のオプションを追加することを推奨
-            options.add_experimental_option("excludeSwitches", ["enable-automation"])
-            options.add_experimental_option("useAutomationExtension", False)
             options.add_argument("--disable-blink-features=AutomationControlled")
 
             self.driver = uc.Chrome(options=options)

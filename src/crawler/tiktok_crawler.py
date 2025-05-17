@@ -11,13 +11,16 @@ import time
 from typing import Optional, List, Dict, Tuple
 import json
 import os
-from ..database.models import CrawlerAccount, FavoriteUser, VideoHeavyRawData, VideoLightRawData
+from ..database.models import CrawlerAccount, FavoriteUser, VideoHeavyRawData, VideoLightRawData, VideoPlayCountRawData
 from ..database.repositories import CrawlerAccountRepository, FavoriteUserRepository, VideoRepository
 from ..database.database import Database
-from .selenium_manager import SeleniumManager, MobileSeleniumManager
+from .selenium_manager import SeleniumManager
 from ..logger import setup_logger
 import grpc
 from google.cloud import pubsub_v1
+from selenium.webdriver.common.action_chains import ActionChains
+from selenium.webdriver.common.actions.pointer_input import PointerInput
+from selenium.webdriver.common.actions import interaction
 
 logger = setup_logger(__name__)
 pubsub_emulator_host = os.getenv('PUBSUB_EMULATOR_HOST')
@@ -314,12 +317,29 @@ class TikTokCrawler:
     # Condition: 自由
     # Args:
     #     username: ユーザー名
-    def navigate_to_user_page(self, username: str):
+    #     device_type: デバイスタイプ（"pc" または "mobile"）
+    def navigate_to_user_page(self, username: str, device_type: str = "pc"):
         logger.debug(f"ユーザー @{username} のページに移動中...")
         self.driver.get(f"{self.BASE_URL}/@{username}")
         self.driver.execute_script("document.body.style.width=''")   # ← 各ページ後に一発
         self._random_sleep(2.0, 4.0)
         
+        # モバイルデバイスの場合、「後で」ボタンが表示されることがある
+        if device_type == "mobile":
+            try:
+                # モーダルが表示されるまで少し待機
+                WebDriverWait(self.driver, 5).until(
+                    EC.presence_of_element_located((By.ID, "login-modal"))
+                )
+                
+                # 「後で」ボタンを探してクリック
+                cancel_btn = self.driver.find_element(By.CSS_SELECTOR, "button[data-e2e='alt-middle-cta-cancel-btn']")
+                logger.debug("「後で」ボタンを見つけました。クリックします。")
+                self.driver.execute_script("arguments[0].click();", cancel_btn)
+                self._random_sleep(1.0, 2.0)
+            except (TimeoutException, NoSuchElementException):
+                # モーダルまたは「後で」ボタンが表示されない場合は何もしない
+                pass
 
         # user-page要素の存在を待機
         self.wait.until(
@@ -328,21 +348,28 @@ class TikTokCrawler:
 
         try:
             self.wait.until(
-                EC.presence_of_element_located((By.CSS_SELECTOR, "[data-e2e='user-post-item']"))
+                EC.presence_of_element_located((By.CSS_SELECTOR, "[data-e2e='user-post-item'],div[data-e2e='user-item-list']"))
             )
         
         except TimeoutException:
             try:
-                 # アカウント削除確認用の要素を探す
-                deleted_account_element = self.driver.find_element(By.CSS_SELECTOR, "div.css-1osbocj-DivErrorContainer")
-                error_text = deleted_account_element.find_element(By.CSS_SELECTOR, "p.css-1y4x9xk-PTitle").text
-            
+                # アカウント削除確認用の要素を探す
+                error_container = self.driver.find_element(By.CSS_SELECTOR, "div[class*='-DivErrorContainer']")
+                error_text = error_container.find_element(By.CSS_SELECTOR, "p[class*='-PTitle']").text
+
                 if error_text == "このアカウントは見つかりませんでした":
                     logger.info(f"ユーザー @{username} は削除されたようです。データベースのis_aliveをFalseに更新します。")
                     self.favorite_user_repo.update_favorite_user_is_alive(username, False)
                     raise self.TikTokUserNotFoundException(f"ユーザー @{username} は存在しません")
+                elif error_text == "このアカウントは非公開です":
+                    logger.info(f"ユーザー @{username} は非公開アカウントです。データベースのis_aliveをFalseに更新します。")
+                    self.favorite_user_repo.update_favorite_user_is_alive(username, False)
+                    raise self.TikTokUserNotFoundException(f"ユーザー @{username} は非公開アカウントです")
+                elif "コンテンツはありません" in error_text:
+                    logger.info(f"ユーザー @{username} はコンテンツのないアカウントです。処理を続行します。")
+                    # コンテンツがない場合は処理を続行する（例外を発生させない）
             except NoSuchElementException:
-                # 削除確認要素が見つからない場合は正常なユーザーページとして処理を続行
+                # 削除確認要素や非公開確認要素が見つからない場合は正常なユーザーページとして処理を続行
                 pass        
         # ユーザーページの読み込みを確認
         logger.debug(f"ユーザー @{username} のページに移動しました")
@@ -362,7 +389,7 @@ class TikTokCrawler:
         for _ in range(max_scroll_attempts or need_items_count // 2):
             self._random_sleep(1.0, 2.0)
             # 現在の要素と画像の数を取得
-            current_items = self.driver.find_elements(By.CSS_SELECTOR, "div[data-e2e='user-post-item']")
+            current_items = self.driver.find_elements(By.CSS_SELECTOR, "div[data-e2e='user-post-item'],div[data-e2e='video-item']")
             current_items_count = len(current_items)
             current_images_count = len([item for item in current_items
                 if item.find_elements(By.CSS_SELECTOR, "img[src*='tiktokcdn']")])
@@ -373,29 +400,53 @@ class TikTokCrawler:
                 logger.debug(f"目標以上の{current_items_count}件の画像要素を確認しました。スクロールを完了します。")
                 return True
             
-            # スクロールを3回に分けて実行
+            # スクロール処理をデバイスタイプに応じて分ける
             try:
-                final_target_scroll = self.driver.execute_script("return document.body.scrollHeight - 200;")
-                current_scroll = self.driver.execute_script("return window.pageYOffset;")
-                scroll_step = (final_target_scroll - current_scroll) / 3
-                
-                for i in range(3):
-                    target_scroll = current_scroll + scroll_step * (i + 1)
-                    self.driver.execute_script(f"window.scrollTo({{top: {target_scroll}, left: 0, behavior: 'smooth'}});")
-                    self._random_sleep(0.3, 0.7)  # 各スクロールの間に少し待機
-                
-            except TimeoutException:
+                if self.device_type == "mobile":
+                    # モバイル向けのスワイプスクロール
+                    from selenium.webdriver.common.action_chains import ActionChains
+                    from selenium.webdriver.common.actions.pointer_input import PointerInput
+                    from selenium.webdriver.common.actions import interaction
+
+                    # 画面の中央から下から上へスワイプ
+                    actions = ActionChains(self.driver)
+                    actions.w3c_actions = ActionChains(self.driver).w3c_actions
+                    
+                    # スワイプの開始点と終了点
+                    start_x = 195  # 画面の横幅の中央 (390/2)
+                    start_y = 700  # 画面の下部
+                    end_y = 300    # スワイプの終点
+                    
+                    # スワイプ操作を実行
+                    actions.w3c_actions.pointer_action.move_to_location(start_x, start_y)
+                    actions.w3c_actions.pointer_action.pointer_down()
+                    actions.w3c_actions.pointer_action.move_to_location(start_x, end_y)
+                    actions.w3c_actions.pointer_action.pointer_up()
+                    actions.perform()
+                else:
+                    # PC向けのスクロール
+                    final_target_scroll = self.driver.execute_script("return document.body.scrollHeight - 200;")
+                    current_scroll = self.driver.execute_script("return window.pageYOffset;")
+                    scroll_step = (final_target_scroll - current_scroll) / 3
+                    
+                    for i in range(3):
+                        target_scroll = current_scroll + scroll_step * (i + 1)
+                        self.driver.execute_script(f"window.scrollTo({{top: {target_scroll}, left: 0, behavior: 'smooth'}});")
+                        self._random_sleep(0.3, 0.7)
+            
+            except Exception as e:
+                logger.debug(f"スクロール中にエラーが発生しました: {e}")
                 logger.debug(f"これ以上スクロールできません。スクロールを中止します。{current_items_count}件の画像要素を確認しました")
                 return False
             
             try:
                 wait = WebDriverWait(self.driver, 10)
                 #新しい要素がロードされるまで待機
-                wait.until(lambda driver: len(driver.find_elements(By.CSS_SELECTOR, "div[data-e2e='user-post-item']")) > current_items_count)
+                wait.until(lambda driver: len(driver.find_elements(By.CSS_SELECTOR, "div[data-e2e='user-post-item'],div[data-e2e='video-item']")) > current_items_count)
                 
                 # 新しい画像がロードされるまで待機
                 wait.until(lambda driver: len([
-                    item for item in driver.find_elements(By.CSS_SELECTOR, "div[data-e2e='user-post-item']")
+                    item for item in driver.find_elements(By.CSS_SELECTOR, "div[data-e2e='user-post-item'],div[data-e2e='video-item']")
                     if item.find_elements(By.CSS_SELECTOR, "img[src*='tiktokcdn']")
                 ]) > current_images_count)
                 last_load_failed = False
@@ -458,6 +509,48 @@ class TikTokCrawler:
         
         logger.debug(f"動画の軽いデータの前半を取得しました: {len(video_stats)}件")
         return video_stats
+    
+    # 動画の再生数の軽いデータを取得する
+    # Condition: ユーザーページが開かれていること
+    # Args:
+    #     max_videos: 取得する動画の最大数
+    # Returns: 動画の再生数の軽いデータの前半(辞書型)のリスト
+    def get_video_play_count_datas_from_user_page(self, max_videos: int = 20) -> List[Dict[str, str]]:
+        logger.debug(f"動画の再生数の軽いデータの前半を取得中...")
+        video_stats = []
+        self._random_sleep(15.0, 20.0)
+        
+        self.scroll_user_page(max_videos)
+        video_elements = self.driver.find_elements(By.CSS_SELECTOR, "[data-e2e='video-item']")
+
+        logger.debug(f"動画の再生数を求めて{len(video_elements[:max_videos])}本の動画要素を走査します")
+        for video_element in video_elements[:max_videos]:
+            try:
+                # 動画のURLを取得
+                video_link = video_element.find_element(By.TAG_NAME, "a")
+                video_url = video_link.get_attribute("href")
+
+                # URLからvideo_idとuser_usernameを抽出
+                video_id, user_username = parse_tiktok_video_url(video_url)
+                
+                # いいね数を取得（表示形式のまま）
+                play_count_element = video_element.find_element(By.CSS_SELECTOR, "[data-e2e='video-views']") # video-viewsといいながらいいね数
+                play_count_text = play_count_element.text
+                
+                video_stats.append({
+                    "video_url": video_url,
+                    "video_id": video_id,
+                    "user_username": user_username,
+                    "play_count_text": play_count_text,
+                    "crawling_algorithm": "selenium-human-like-1"
+                })
+            
+            except NoSuchElementException:
+                logger.warning(f"動画の軽いデータの前半の取得のうち1件に失敗", exc_info=True)
+                continue
+        logger.debug(f"動画の再生数を取得しました: {len(video_stats)}件")
+        return video_stats
+    
 
     # ピン留めされていない動画の中で最も新しいもののURLを取得する
     # Condition: ユーザーページが開かれていること
@@ -526,9 +619,10 @@ class TikTokCrawler:
                     else:
                         WebDriverWait(self.driver, 20).until(
                             EC.any_of(
+                                EC.presence_of_element_located((By.CSS_SELECTOR, "[data-e2e='video-desc']")),
                                 EC.presence_of_element_located((By.CSS_SELECTOR, "[data-e2e='user-title']")),
-                                EC.presence_of_element_located((By.CSS_SELECTOR, "[data-e2e='browse-username']")),
-                                EC.presence_of_element_located((By.CSS_SELECTOR, "[class*='DivInfoContainer']"))
+                                EC.presence_of_element_located((By.CSS_SELECTOR, "[data-e2e='browse-username']"))
+                                
                             )
                         )
                     
@@ -562,16 +656,36 @@ class TikTokCrawler:
         logger.debug(f"動画の重いデータを取得中...")
     
         video_url = self.driver.current_url
-        user_username = self.driver.find_element(By.CSS_SELECTOR, "[data-e2e='browse-username']").text
-        user_nickname = self.driver.find_element(By.CSS_SELECTOR, "[data-e2e='browser-nickname']").text
-        video_title = self.driver.find_element(By.CSS_SELECTOR, "[data-e2e='browse-video-desc']").text
-        post_time_text = self.driver.find_element(By.CSS_SELECTOR, "[data-e2e='browser-nickname'] span:last-child").text
-        audio_url = self.driver.find_element(By.CSS_SELECTOR, "[data-e2e='browse-music'] a").get_attribute("href")
+        user_username = self.driver.find_element(By.CSS_SELECTOR, "[data-e2e='browse-username'],[data-e2e='user-title']").text
+        user_nickname = self.driver.find_element(By.CSS_SELECTOR, "[data-e2e='browser-nickname'],[data-e2e='user-subtitle']").text
+        video_title = self.driver.find_element(By.CSS_SELECTOR, "[data-e2e='browse-video-desc'],[data-e2e='video-desc']").text
+        post_time_element = self.driver.find_element(By.CSS_SELECTOR, "a[class*='StyledAuthorAnchor'], [data-e2e='video-author-uniqueid'], [data-e2e='browser-nickname'] span:last-child")
+        audio_url = self.driver.find_element(By.CSS_SELECTOR, "[data-e2e='browse-music'] a,[data-e2e='video-music']").get_attribute("href")
+        try:
+            # まず新しい形式を試す
+            audio_element = self.driver.find_element(By.CSS_SELECTOR, 
+                "[data-e2e='video-music']")
+            audio_info_text = audio_element.get_attribute("aria-label").replace("Watch more videos with music ", "")
+        except (NoSuchElementException, AttributeError):
+            try:
+                # 次に古い形式を試す
+                audio_info_text = self.driver.find_element(By.CSS_SELECTOR, 
+                    "[data-e2e='browse-music'] .css-pvx3oa-DivMusicText, [data-e2e='browse-music-title']").text
+            except NoSuchElementException:
+                audio_info_text = ""
         audio_info_text = self.driver.find_element(By.CSS_SELECTOR, "[data-e2e='browse-music'] .css-pvx3oa-DivMusicText").text
-        like_count_text = self.driver.find_element(By.CSS_SELECTOR, "strong[data-e2e='browse-like-count']").text
-        comment_count_text = self.driver.find_element(By.CSS_SELECTOR, "strong[data-e2e='browse-comment-count']").text
+        like_count_text = self.driver.find_element(By.CSS_SELECTOR, "strong[data-e2e='browse-like-count'],strong[data-e2e='like-count']").text
+        comment_count_text = self.driver.find_element(By.CSS_SELECTOR, "strong[data-e2e='browse-comment-count'],strong[data-e2e='comment-count']").text
         collect_count_text = self.driver.find_element(By.CSS_SELECTOR, "strong[data-e2e='undefined-count']").text
         
+        # 取得したテキストを処理
+        full_text = post_time_element.text
+        if " · " in full_text:
+            # 新形式の場合は分割して最後の部分を取得
+            post_time_text = full_text.split(" · ")[-1]
+        else:
+            # 旧形式の場合はそのまま使用
+            post_time_text = full_text
         logger.debug(f"動画の重いデータを取得しました: {video_url}")
 
         return {
@@ -642,10 +756,11 @@ class TikTokCrawler:
                 try:
                     close_button = WebDriverWait(self.driver, 8).until(
                         EC.any_of(
+                            EC.element_to_be_clickable((By.CSS_SELECTOR, ".TUXButton[aria-label='exit']")),
+                            EC.element_to_be_clickable((By.CSS_SELECTOR, "button[aria-label='exit']")),
                             EC.element_to_be_clickable((By.CSS_SELECTOR, "[data-e2e='browse-close']")),
                             EC.element_to_be_clickable((By.CSS_SELECTOR, "a[data-e2e='browse-user-avatar']")),
                             EC.element_to_be_clickable((By.CSS_SELECTOR, "[class*='CloseButton']")),
-                            EC.element_to_be_clickable((By.CSS_SELECTOR, "button[aria-label='閉じる']")),
                             EC.element_to_be_clickable((By.CSS_SELECTOR, "button[aria-label='Close']"))
                         )
                     )
@@ -860,7 +975,7 @@ class TikTokCrawler:
     # Args:
     #     heavy_data: 動画の重いデータ(辞書型)
     #     thumbnail_url: 動画のサムネイル画像のURL
-    def parse_and_save_video_heavy_data(self, heavy_data: Dict, thumbnail_url: str, play_count: Optional[int] = None,video_alt_info_text: Optional[str] = None):
+    def parse_and_save_video_heavy_data(self, heavy_data: Dict, thumbnail_url: str, video_alt_info_text: Optional[str] = None):
         logger.debug(f"動画の重いデータをパースおよび保存中...: {heavy_data['video_url']}")
 
         video_id, _ = parse_tiktok_video_url(heavy_data["video_url"])
@@ -892,8 +1007,6 @@ class TikTokCrawler:
             audio_id=None,  # ここでは取得できない(できるかも)
             audio_title=audio_title,
             audio_author_name=audio_author_name,
-            play_count_text=None,  # ここでは取得できない
-            play_count=play_count,  # 引数から設定
             like_count_text=heavy_data.get("like_count_text"),
             like_count=parse_tiktok_number(heavy_data.get("like_count_text")),
             comment_count_text=heavy_data.get("comment_count_text"),
@@ -922,7 +1035,6 @@ class TikTokCrawler:
             "video_title": video_alt_info_text,
             "post_time": post_time.isoformat() if post_time else None,
             "audio_title": audio_title,
-            "play_count": play_count,
             "like_count": parse_tiktok_number(heavy_data.get("like_count_text")),
             "comment_count": parse_tiktok_number(heavy_data.get("comment_count_text")),
             "save_count": parse_tiktok_number(heavy_data.get("collect_count_text"))
@@ -966,26 +1078,26 @@ class TikTokCrawler:
     # Args:
     #     light_like_datas: 動画の軽いデータの前半(辞書型)のリスト
     #     light_play_datas: 動画の軽いデータの後半(辞書型)のリスト
-    def parse_and_save_video_light_datas(self, light_like_datas: List[Dict], light_play_datas: List[Dict]):
+    def parse_and_save_video_light_datas(self, light_like_datas: List[Dict]):
         logger.debug(f"動画の軽いデータをパースおよび保存中...")
 
         # デバッグ用：CSVファイルに出力
         self._save_debug_csv(light_like_datas, "light_like_datas")
-        self._save_debug_csv(light_play_datas, "light_play_datas")
+        # self._save_debug_csv(light_play_datas, "light_play_datas")
 
         # サムネイルURLのエッセンスをキーに、再生数をマッピング
-        play_count_map = {}
-        for play_data in light_play_datas:
-            thumbnail_essence = extract_thumbnail_essence(play_data["video_thumbnail_url"])
-            play_count_map[thumbnail_essence] = play_data["play_count_text"]
+        # play_count_map = {}
+        # for play_data in light_play_datas:
+        #     thumbnail_essence = extract_thumbnail_essence(play_data["video_thumbnail_url"])
+        #     play_count_map[thumbnail_essence] = play_data["play_count_text"]
         
         # いいね数データを処理し、再生数を追加
-        play_count_not_found = 0
+        # play_count_not_found = 0
         for like_data in light_like_datas:
-            thumbnail_essence = extract_thumbnail_essence(like_data["video_thumbnail_url"])
-            play_count_text = play_count_map.get(thumbnail_essence)
-            if not play_count_text:
-                play_count_not_found += 1
+            # thumbnail_essence = extract_thumbnail_essence(like_data["video_thumbnail_url"])
+            # play_count_text = play_count_map.get(thumbnail_essence)
+            # if not play_count_text:
+            #     play_count_not_found += 1
 
             data = VideoLightRawData(
                 id=None,
@@ -994,8 +1106,6 @@ class TikTokCrawler:
                 user_username=like_data["user_username"],
                 video_thumbnail_url=like_data["video_thumbnail_url"],
                 video_alt_info_text=like_data["video_alt_info_text"],
-                play_count_text=play_count_text,
-                play_count=parse_tiktok_number(play_count_text),
                 like_count_text=like_data["like_count_text"],
                 like_count=parse_tiktok_number(like_data["like_count_text"]),
                 crawling_algorithm=like_data["crawling_algorithm"],
@@ -1005,8 +1115,49 @@ class TikTokCrawler:
             # logger.debug(f"動画の軽いデータを保存します: {data.video_id} -> {data.play_count}, {data.like_count}")
             self.video_repo.save_video_light_data(data)
             
-        logger.info(f"動画の軽いデータをパースおよび保存しました: {len(light_like_datas)}件、うちplay_count_textが取れなかったもの: {play_count_not_found}件")
+        logger.info(f"動画の軽いデータをパースおよび保存しました: {len(light_like_datas)}件")
 
+
+    # 動画の再生数の軽いデータをパースおよび保存する
+    # Condition: 自由
+    # Args:
+    #     light_play_datas: 動画の再生数の軽いデータの前半(辞書型)のリスト
+    def parse_and_save_play_count_datas(self, light_play_datas: List[Dict]):
+        logger.debug(f"動画の再生数の軽いデータをパースおよび保存中...")    
+
+        for play_data in light_play_datas:
+            data = VideoPlayCountRawData(
+                id=None,
+                video_url=play_data["video_url"],
+                video_id=play_data["video_id"],
+                user_username=play_data["user_username"],
+                play_count_text=play_data["play_count_text"],
+                play_count=parse_tiktok_number(play_data["play_count_text"]),
+                crawling_algorithm=play_data["crawling_algorithm"],
+                crawled_at=datetime.now()
+            )
+            self.video_repo.save_video_play_count_data(data)
+            publisher = pubsub_v1.PublisherClient()
+        
+            topic_path = publisher.topic_path(project_id, "video-master-sync")
+
+            message_data = {
+                "video_id": play_data["video_id"],
+                "video_url": play_data["video_url"],
+                "play_count": parse_tiktok_number(play_data["play_count_text"])
+            }
+
+            # メッセージをJSON形式にエンコード
+            message_str = json.dumps(message_data)
+            message_bytes = message_str.encode("utf-8")
+
+            try:
+                future = publisher.publish(topic_path, message_bytes)
+                message_id = future.result()
+                logger.info(f"Pub/Subメッセージを送信しました。Message ID: {message_id}")
+            except Exception as e:
+                logger.error(f"Pub/Subメッセージの送信に失敗しました: {e}", exc_info=True)
+        logger.info(f"動画の再生数の軽いデータをパースおよび保存しました: {len(light_play_datas)}件")
 
     # ユーザーの動画データをクロールする
     # Condition: 自由
@@ -1095,41 +1246,45 @@ class TikTokCrawler:
         if light_or_heavy == "both":
             if user.is_new_account == True:
                 logger.info(f"ユーザー @{user.favorite_user_username} の軽いデータののクロールを開始")
-                max_videos_per_batch = 50  # 1回のバッチで取得する動画数
-                target_date = datetime(2025, 1, 1)  # この日付より前の動画が見つかるまでクロール
+                max_videos_per_batch = 30  # 1回のバッチで取得する動画数
+                # target_date = datetime(2025, 1, 1)  # この日付より前の動画が見つかるまでクロール
                 processed_urls = set()  # 処理済みのURLを記録
 
                 while True:
                     # 最新の動画URLを取得してビデオページに移動
-                    first_url = self.get_latest_video_url_from_user_page()
-                    self.navigate_to_video_page(first_url)
-                    self.navigate_to_video_page_creator_videos_tab()
+                    # first_url = self.get_latest_video_url_from_user_page()
+                    # self.navigate_to_video_page(first_url)
+                    # self.navigate_to_video_page_creator_videos_tab()
                     
-                    # 軽いデータを取得
-                    light_play_datas = self.get_video_light_play_datas_from_video_page_creator_videos_tab(max_videos_per_batch + 10)
-                    self.parse_and_save_video_light_datas(light_like_datas, light_play_datas)
-                    self.navigate_to_user_page_from_video_page()
+                    # # 軽いデータを取得
+                    # light_play_datas = self.get_video_light_play_datas_from_video_page_creator_videos_tab(max_videos_per_batch + 10)
+                    self.parse_and_save_video_light_datas(light_like_datas)
+                    # self.navigate_to_user_page_from_video_page()
                     
                     logger.info(f"バッチの軽いデータのクロールを完了しました。重いデータのクロールを開始します。")
                     
 
-                    play_count_map = {}
-                    for play_data in light_play_datas:
-                        thumbnail_essence = extract_thumbnail_essence(play_data["video_thumbnail_url"])
-                        play_count_text = play_data["play_count_text"]
-                        play_count_map[thumbnail_essence] = {
-                            "play_count_text": play_count_text,
-                            "play_count": parse_tiktok_number(play_count_text)
-                        }
+                    # play_count_map = {}
+                    # for play_data in light_play_datas:
+                    #     thumbnail_essence = extract_thumbnail_essence(play_data["video_thumbnail_url"])
+                    #     play_count_text = play_data["play_count_text"]
+                    #     play_count_map[thumbnail_essence] = {
+                    #         "play_count_text": play_count_text,
+                    #         "play_count": parse_tiktok_number(play_count_text)
+                    #     }
             
-                    # light_like_datasに再生数を追加
-                    for light_like_data in light_like_datas:
-                        thumbnail_essence = extract_thumbnail_essence(light_like_data["video_thumbnail_url"])
-                        if thumbnail_essence in play_count_map:
-                            light_like_data.update(play_count_map[thumbnail_essence])
+                    # # light_like_datasに再生数を追加
+                    # for light_like_data in light_like_datas:
+                    #     thumbnail_essence = extract_thumbnail_essence(light_like_data["video_thumbnail_url"])
+                    #     if thumbnail_essence in play_count_map:
+                    #         light_like_data.update(play_count_map[thumbnail_essence])
                             # 重いデータを取得
-                    last_post_time = None
-                    for light_like_data in light_like_datas:
+                    # last_post_time = None
+                    light_like_datas.sort(key=lambda d: int(d["video_id"]), reverse=True)
+
+                    # ③ 先頭 max_videos_per_batch 件だけをバッチ対象にスライス
+                    batch_datas = light_like_datas[:max_videos_per_batch]
+                    for light_like_data in batch_datas:
                         if light_like_data["video_url"] in processed_urls:
                             continue
                         try:
@@ -1139,12 +1294,12 @@ class TikTokCrawler:
                             else:                            
                                 heavy_data = self.get_video_heavy_data_from_video_page()
 
-                            self.parse_and_save_video_heavy_data(heavy_data, light_like_data["video_thumbnail_url"], light_like_data.get("play_count"),light_like_data.get("video_alt_info_text"))
+                            self.parse_and_save_video_heavy_data(heavy_data, light_like_data["video_thumbnail_url"],light_like_data.get("video_alt_info_text"))
                             
                             # 投稿日時を取得して記録
-                            post_time = parse_tiktok_time(heavy_data.get("post_time_text"), datetime.now())
-                            if post_time:
-                                last_post_time = post_time
+                            # post_time = parse_tiktok_time(heavy_data.get("post_time_text"), datetime.now())
+                            # if post_time:
+                            #     last_post_time = post_time
                             
                             processed_urls.add(light_like_data["video_url"])
                             self._random_sleep(10.0, 20.0)
@@ -1156,19 +1311,21 @@ class TikTokCrawler:
                             logger.exception(f"動画 {light_like_data['video_url']} の重いデータのクロール中に失敗。スキップします")
                             continue
                         finally:
-                            # ここで必ず戻る
-                            self.navigate_to_user_page_from_video_page()
+                            try:
+                                self.navigate_to_user_page_from_video_page()
+                            except Exception:
+                                logger.warning("ユーザーページへの戻りに失敗 (無視して続行)")
                     
                     # 最後に処理した動画の投稿日時が2025/1/1より前なら終了
-                    if last_post_time and last_post_time < target_date:
-                        logger.info(f"目標日付（{target_date}）より前の動画を処理したため、クロールを終了します")
-                        self.favorite_user_repo.update_favorite_user_is_new_account(
-                            user.favorite_user_username,
-                            False
-                        )
-                        break
+                    # if last_post_time and last_post_time < target_date:
+                    #     logger.info(f"目標日付（{target_date}）より前の動画を処理したため、クロールを終了します")
+                    #     self.favorite_user_repo.update_favorite_user_is_new_account(
+                    #         user.favorite_user_username,
+                    #         False
+                    #     )
+                    #     break
 
-                    if len(light_like_datas) < 50:
+                    if len(batch_datas) <= max_videos_per_batch:
                         logger.info(f"取得できた動画が{len(light_like_datas)}件と目標の{max_videos_per_batch}件未満のため、全ての動画を取得済みと判断してクロールを終了します")
                         self.favorite_user_repo.update_favorite_user_is_new_account(
                             user.favorite_user_username,
@@ -1176,10 +1333,10 @@ class TikTokCrawler:
                         )
                         break
                         
-                    # まだ2025/1/1より後の動画なら、さらに古い動画を取得するためにスクロール
-                    logger.info(f"まだ目標日付（{target_date}）より後の動画（最終投稿日時: {last_post_time}）のため、さらに古い動画を取得します")
-                    max_videos_per_batch += 50
-                    light_like_datas = self.get_video_light_like_datas_from_user_page(max_videos_per_batch)
+                    # # まだ2025/1/1より後の動画なら、さらに古い動画を取得するためにスクロール
+                    # logger.info(f"まだ目標日付（{target_date}）より後の動画（最終投稿日時: {last_post_time}）のため、さらに古い動画を取得します")
+                    # max_videos_per_batch += 50
+                    # light_like_datas = self.get_video_light_like_datas_from_user_page(max_videos_per_batch)
 
                     # ①投稿が50個未満の場合はストップ
 
@@ -1193,16 +1350,16 @@ class TikTokCrawler:
             else:
                 # 既存の処理（新しいアカウントでない場合）
                 # 最新の動画URLを取得してビデオページに移動
-                first_url = self.get_latest_video_url_from_user_page()
-                self.navigate_to_video_page(first_url)
-                self.navigate_to_video_page_creator_videos_tab()
-                max_videos_per_batch = 50
+                # first_url = self.get_latest_video_url_from_user_page()
+                # self.navigate_to_video_page(first_url)
+                # self.navigate_to_video_page_creator_videos_tab()
+                # max_videos_per_batch = 50
                 # 軽いデータを取得
-                light_play_datas = self.get_video_light_play_datas_from_video_page_creator_videos_tab(max_videos_per_batch + 10)
-                self.parse_and_save_video_light_datas(light_like_datas, light_play_datas)
-                self.navigate_to_user_page_from_video_page()
+                # light_play_datas = self.get_video_light_play_datas_from_video_page_creator_videos_tab(max_videos_per_batch + 10)
+                # self.parse_and_save_video_light_datas(light_like_datas, light_play_datas)
+                # self.navigate_to_user_page_from_video_page()
                     
-                logger.info(f"バッチの軽いデータのクロールを完了しました。重いデータのクロールを開始します。")
+                # logger.info(f"バッチの軽いデータのクロールを完了しました。重いデータのクロールを開始します。")
                  # needs_update=1の動画を取得
                 logger.info(f"ユーザー @{user.favorite_user_username} の更新が必要な動画を取得します")
                 videos_needing_update = self.video_repo.get_videos_needing_update(user.favorite_user_username)
@@ -1217,7 +1374,7 @@ class TikTokCrawler:
                             heavy_data = self.get_video_heavy_data_from_direct_access()
                         else:                            
                             heavy_data = self.get_video_heavy_data_from_video_page()
-                        self.parse_and_save_video_heavy_data(heavy_data, video["video_thumbnail_url"], video.get("play_count"),video.get("video_alt_info_text"))
+                        self.parse_and_save_video_heavy_data(heavy_data, video["video_thumbnail_url"],video.get("video_alt_info_text"))
                         self._random_sleep(10.0, 20.0)
                     except KeyboardInterrupt:
                         raise
@@ -1225,8 +1382,10 @@ class TikTokCrawler:
                         logger.exception(f"動画 {video['video_url']} の重いデータのクロール中に失敗。スキップします")
                         continue
                     finally:
-                        # ここで必ず戻る
-                        self.navigate_to_user_page_from_video_page()
+                        try:
+                            self.navigate_to_user_page_from_video_page()
+                        except Exception:
+                            logger.warning("ユーザーページへの戻りに失敗 (無視して続行)")
 
                 logger.info(f"ユーザー @{user.favorite_user_username} の重いデータのクロールを完了しました")
             logger.info(f"ユーザー @{user.favorite_user_username} の重いデータのクロールを完了しました")
@@ -1248,23 +1407,54 @@ class TikTokCrawler:
     #     max_videos_per_user: 1ユーザーあたりの動画数
     #     max_users: 1クロール対象のユーザー数
     #     recrawl: 既に重いデータを取得済みの動画を再取得するかどうか
-    def crawl_favorite_users(self, light_or_heavy: str = "both", max_videos_per_user: int = 100, max_users: int = 10, recrawl: bool = True):
+    def crawl_favorite_users(self, light_or_heavy: str = "both", max_videos_per_user: int = 100, max_users: int = 10, recrawl: bool = True, device_type: str = "pc"):
         logger.info(f"クロール対象のお気に入りユーザー{max_users}件に対し{light_or_heavy}データのクロールを行います")
-        favorite_users = self.favorite_user_repo.get_favorite_users(
-            self.crawler_account.id,
-            limit=max_users
-        )
+        if device_type == "mobile":
+            favorite_users = self.favorite_user_repo.get_favorite_users_by_video_crawler_id(
+                self.crawler_account.video_crawler_id,
+                limit=max_users
+            )
+            for user in favorite_users:
+                try:
+                    self.crawl_play_count(user,max_videos_per_user=max_videos_per_user)
+                except KeyboardInterrupt:
+                    raise
+                except Exception:
+                    logger.exception(f"ユーザー @{user.favorite_user_username} の再生数データのクロール中に失敗。スキップします")
+                    continue
+        else:
+            favorite_users = self.favorite_user_repo.get_favorite_users(
+                self.crawler_account.id,
+                limit=max_users
+            )
 
-        for user in favorite_users:
-            try:
-                self.crawl_user(user, light_or_heavy=light_or_heavy, max_videos_per_user=max_videos_per_user, recrawl=recrawl)
-            except KeyboardInterrupt:
-                raise
-            except Exception:
-                logger.exception(f"ユーザー @{user.favorite_user_username} の{light_or_heavy}データのクロール中に失敗。スキップします")
-                continue
+            for user in favorite_users:
+                try:
+                    self.crawl_user(user, light_or_heavy=light_or_heavy, max_videos_per_user=max_videos_per_user, recrawl=recrawl)
+                except KeyboardInterrupt:
+                    raise
+                except Exception:
+                    logger.exception(f"ユーザー @{user.favorite_user_username} の{light_or_heavy}データのクロール中に失敗。スキップします")
+                    continue
         
         logger.info(f"クロール対象のお気に入りユーザー{len(favorite_users)}件に対し{light_or_heavy}データのクロールを完了しました")
+
+    def crawl_play_count(self, user: FavoriteUser, max_videos_per_user: int = 21):
+        logger.info(f"ユーザー @{user.favorite_user_username} の軽いデータのクロールを開始")
+        try:
+            self.navigate_to_user_page(user.favorite_user_username)
+        except self.TikTokUserNotFoundException:
+            logger.info(f"ユーザー @{user.favorite_user_username} は存在しないので、このユーザーに対するクロールを中断します")
+            return False # ユーザー単位でしか問題にならないエラーなのでここで処置完了としてよい
+        except Exception:
+            raise
+        
+        light_play_datas = self.get_video_play_count_datas_from_user_page(max_videos_per_user)
+
+        logger.info(f"ユーザー @{user.favorite_user_username} の再生数の取得が完了")
+
+        self.parse_and_save_play_count_datas(light_play_datas)
+        logger.info(f"ユーザー @{user.favorite_user_username} の再生数のクロールを完了しました。")
 
     def _setup_mobile_fingerprinter(self):
         """モバイル用のfingerprinterをセットアップする"""
@@ -1339,13 +1529,15 @@ def main():
             favorite_user_repo=favorite_user_repo,
             video_repo=video_repo,
             crawler_account_id=args.crawler_account_id,
-            sadcaptcha_api_key=os.getenv("SADCAPTCHA_API_KEY")  # APIキーを設定
+            sadcaptcha_api_key=os.getenv("SADCAPTCHA_API_KEY"),  # APIキーを設定
+            device_type=args.device_type
         ) as crawler:
             crawler.crawl_favorite_users(
                 light_or_heavy=args.mode,
                 max_videos_per_user=args.max_videos_per_user,
                 max_users=args.max_users,
-                recrawl=args.recrawl
+                recrawl=args.recrawl,
+                device_type=args.device_type
             )
 
 if __name__ == "__main__":

@@ -1,0 +1,53 @@
+2025-05-17 21:11:41,582 - src.crawler.selenium_manager - INFO - SeleniumManager初期化: device_type=pc
+2025-05-17 21:11:41,583 - src.crawler.selenium_manager - INFO - PC用の設定を適用します
+2025-05-17 21:11:44,451 - src.crawler.selenium_manager - INFO - CAPTCHA Solver付きのドライバーを作成します
+2025-05-17 21:11:44,530 - src.crawler.selenium_manager - INFO - Chromeドライバーの設定が完了しました
+2025-05-17 21:11:44,531 - __main__ - INFO - クロール用アカウントningshichui@gmail.comでTikTokにログイン中...
+2025-05-17 21:12:03,477 - src.crawler.selenium_manager - DEBUG - captcha_present=True
+2025-05-17 21:12:03,479 - src.crawler.selenium_manager - INFO - [1/10] CAPTCHA 解決を試行中…
+2025-05-17 21:12:08,094 - src.crawler.selenium_manager - DEBUG - solve_CaptchaType.ROTATE_V2() => None
+2025-05-17 21:12:08,124 - src.crawler.selenium_manager - INFO - CAPTCHA まだ残存。3s 待って再試行
+2025-05-17 21:12:11,126 - src.crawler.selenium_manager - INFO - [2/10] CAPTCHA 解決を試行中…
+2025-05-17 21:12:46,057 - src.crawler.selenium_manager - ERROR - CAPTCHA 解決中に例外が発生: Neither puzzle, shapes, or rotate captcha was present.
+2025-05-17 21:12:46,074 - __main__ - INFO - クロール用アカウントningshichui@gmail.comでTikTokへのログインに成功しました
+2025-05-17 21:12:46,081 - __main__ - INFO - クロール対象のお気に入りユーザー10件に対しbothデータのクロールを行います
+2025-05-17 21:12:46,093 - __main__ - INFO - ユーザー @zerehoszrlp のbothデータのクロールを開始
+2025-05-17 21:12:46,093 - __main__ - DEBUG - ユーザー @zerehoszrlp のページに移動中...
+2025-05-17 21:12:53,065 - __main__ - DEBUG - ユーザー @zerehoszrlp のページに移動しました
+2025-05-17 21:12:53,065 - __main__ - DEBUG - 動画の軽いデータの前半を取得中...
+2025-05-17 21:13:27,448 - __main__ - DEBUG - 100件の画像要素を目標にユーザーページをスクロールします...
+2025-05-17 21:13:29,659 - __main__ - DEBUG - 51件の画像要素を確認しました。
+2025-05-17 21:13:33,154 - __main__ - DEBUG - 67件の画像要素を確認しました。
+2025-05-17 21:13:37,462 - __main__ - DEBUG - 99件の画像要素を確認しました。
+2025-05-17 21:13:42,493 - __main__ - DEBUG - 131件の画像要素を確認しました。
+2025-05-17 21:13:42,494 - __main__ - DEBUG - 目標以上の131件の画像要素を確認しました。スクロールを完了します。
+2025-05-17 21:13:42,583 - __main__ - DEBUG - 動画の軽いデータの前半を求めて100本の動画要素を走査します
+2025-05-17 21:13:46,394 - __main__ - DEBUG - 動画の軽いデータの前半を取得しました: 100件
+2025-05-17 21:13:46,395 - __main__ - DEBUG - ユーザー @zerehoszrlp のlast_crawledを更新します
+2025-05-17 21:13:46,414 - __main__ - INFO - ユーザー @zerehoszrlp の軽いデータののクロールを開始
+2025-05-17 21:13:46,415 - __main__ - DEBUG - 動画の軽いデータをパースおよび保存中...
+2025-05-17 21:13:46,420 - __main__ - DEBUG - light_like_datasをoutput\debug\light_like_datas_20250517_211346.csvに出力しました: 100件
+2025-05-17 21:13:46,422 - __main__ - ERROR - ユーザー @zerehoszrlp のbothデータのクロール中に失敗。スキップします
+Traceback (most recent call last):
+  File "D:\app_ssd\Crawlsel2\TikTokCrawlSel_v2\src\crawler\tiktok_crawler.py", line 1432, in crawl_favorite_users
+    self.crawl_user(user, light_or_heavy=light_or_heavy, max_videos_per_user=max_videos_per_user, recrawl=recrawl)
+  File "D:\app_ssd\Crawlsel2\TikTokCrawlSel_v2\src\crawler\tiktok_crawler.py", line 1260, in crawl_user
+    self.parse_and_save_video_light_datas(light_like_datas)
+  File "D:\app_ssd\Crawlsel2\TikTokCrawlSel_v2\src\crawler\tiktok_crawler.py", line 1116, in parse_and_save_video_light_datas
+    self.video_repo.save_video_light_data(data)
+  File "D:\app_ssd\Crawlsel2\TikTokCrawlSel_v2\src\database\repositories.py", line 276, in save_video_light_data
+    self.db.execute_query(query, (
+  File "D:\app_ssd\Crawlsel2\TikTokCrawlSel_v2\src\database\database.py", line 43, in execute_query
+    cursor.execute(query, params)
+  File "C:\Users\kyoto\OneDrive\ドキュメント\code\tik_api\venv\Lib\site-packages\mysql\connector\cursor_cext.py", line 367, in execute
+    stmt = RE_PY_PARAM.sub(psub, stmt)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\kyoto\OneDrive\ドキュメント\code\tik_api\venv\Lib\site-packages\mysql\connector\cursor_cext.py", line 120, in __call__
+    raise ProgrammingError(
+mysql.connector.errors.ProgrammingError: Not enough parameters for the SQL statement
+2025-05-17 21:13:46,460 - __main__ - INFO - ユーザー @nito_ninaritai_na のbothデータのクロールを開始
+2025-05-17 21:13:46,461 - __main__ - DEBUG - ユーザー @nito_ninaritai_na のページに移動中...
+2025-05-17 21:13:51,940 - __main__ - DEBUG - ユーザー @nito_ninaritai_na のページに移動しました
+2025-05-17 21:13:51,942 - __main__ - DEBUG - 動画の軽いデータの前半を取得中...
+2025-05-17 21:14:01,941 - src.crawler.selenium_manager - INFO - Chromeドライバーを終了しました
+2025-05-17 21:14:01,947 - __main__ - INFO - ユーザーにより中断されました

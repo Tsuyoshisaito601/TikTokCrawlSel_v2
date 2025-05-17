@@ -1,0 +1,69 @@
+2025-05-17 22:23:40,015 - src.database.database - INFO - データベースに接続しました
+2025-05-17 22:23:40,023 - __main__ - INFO - モバイル用fingerprinterをセットアップします...
+2025-05-17 22:23:40,024 - src.crawler.selenium_manager - INFO - SeleniumManager初期化: device_type=mobile
+2025-05-17 22:23:40,025 - src.crawler.selenium_manager - INFO - モバイル用の設定を適用します
+2025-05-17 22:23:42,855 - src.crawler.selenium_manager - INFO - モバイル用CAPTCHA Solver付きのドライバーを作成します
+2025-05-17 22:23:42,931 - src.crawler.selenium_manager - INFO - モバイル用Chromeドライバーの設定が完了しました
+2025-05-17 22:23:42,932 - __main__ - INFO - モバイル用fingerprinterのセットアップが完了しました
+2025-05-17 22:23:42,932 - __main__ - INFO - クロール用アカウントharuto_tanaka@isle-inc.comでTikTokにログイン中...
+2025-05-17 22:24:04,127 - src.crawler.selenium_manager - DEBUG - captcha_present=True
+2025-05-17 22:24:04,143 - src.crawler.selenium_manager - INFO - [1/10] CAPTCHA 解決を試行中…
+2025-05-17 22:24:07,311 - src.crawler.selenium_manager - DEBUG - solve_CaptchaType.ROTATE_V2() => None
+2025-05-17 22:24:07,337 - src.crawler.selenium_manager - INFO - CAPTCHA まだ残存。3s 待って再試行
+2025-05-17 22:24:10,339 - src.crawler.selenium_manager - INFO - [2/10] CAPTCHA 解決を試行中…
+2025-05-17 22:24:45,851 - src.crawler.selenium_manager - ERROR - CAPTCHA 解決中に例外が発生: Neither puzzle, shapes, or rotate captcha was present.
+2025-05-17 22:24:45,880 - __main__ - INFO - クロール用アカウントharuto_tanaka@isle-inc.comでTikTokへのログインに成功しました
+2025-05-17 22:24:45,893 - __main__ - INFO - クロール対象のお気に入りユーザー1000件に対しbothデータのクロールを行います
+2025-05-17 22:24:45,942 - __main__ - INFO - ユーザー @yurileeeee の軽いデータのクロールを開始
+2025-05-17 22:24:45,942 - __main__ - DEBUG - ユーザー @yurileeeee のページに移動中...
+2025-05-17 22:24:50,360 - __main__ - DEBUG - ユーザー @yurileeeee のページに移動しました
+2025-05-17 22:24:50,360 - __main__ - DEBUG - 動画の再生数の軽いデータの前半を取得中...
+2025-05-17 22:25:08,742 - __main__ - DEBUG - 100件の画像要素を目標にユーザーページをスクロールします...
+2025-05-17 22:25:09,925 - __main__ - DEBUG - 24件の画像要素を確認しました。
+2025-05-17 22:25:20,745 - __main__ - WARNING - 新しい画像要素のロードがタイムアウトしました。24件の画像要素を確認しました。もう1度だけスクロールを試みます。
+2025-05-17 22:25:22,603 - __main__ - DEBUG - 24件の画像要素を確認しました。
+2025-05-17 22:25:33,399 - __main__ - WARNING - 新しい画像要素のロードが2回続けてタイムアウトしました。24件の画像要素を確認しました。スクロールを中止します。
+Traceback (most recent call last):
+  File "D:\app_ssd\Crawlsel2\TikTokCrawlSel_v2\src\crawler\tiktok_crawler.py", line 445, in scroll_user_page
+    wait.until(lambda driver: len(driver.find_elements(By.CSS_SELECTOR, "div[data-e2e='user-post-item'],div[data-e2e='video-item']")) > current_items_count)
+  File "C:\Users\kyoto\OneDrive\ドキュメント\code\tik_api\venv\Lib\site-packages\selenium\webdriver\support\wait.py", line 105, in until
+    raise TimeoutException(message, screen, stacktrace)
+selenium.common.exceptions.TimeoutException: Message: 
+
+2025-05-17 22:25:33,424 - __main__ - DEBUG - 動画の再生数を求めて24本の動画要素を走査します
+2025-05-17 22:25:33,957 - __main__ - DEBUG - 動画の再生数を取得しました: 24件
+2025-05-17 22:25:33,957 - __main__ - INFO - ユーザー @yurileeeee の再生数の取得が完了
+2025-05-17 22:25:33,970 - __main__ - DEBUG - 動画の再生数の軽いデータをパースおよび保存中...
+2025-05-17 22:25:34,054 - __main__ - INFO - Pub/Subメッセージを送信しました。Message ID: 5
+2025-05-17 22:25:34,080 - __main__ - INFO - Pub/Subメッセージを送信しました。Message ID: 6
+2025-05-17 22:25:34,113 - __main__ - INFO - Pub/Subメッセージを送信しました。Message ID: 7
+2025-05-17 22:25:34,144 - __main__ - INFO - Pub/Subメッセージを送信しました。Message ID: 8
+2025-05-17 22:25:34,173 - __main__ - INFO - Pub/Subメッセージを送信しました。Message ID: 9
+2025-05-17 22:25:34,200 - __main__ - INFO - Pub/Subメッセージを送信しました。Message ID: 10
+2025-05-17 22:25:34,228 - __main__ - INFO - Pub/Subメッセージを送信しました。Message ID: 11
+2025-05-17 22:25:34,254 - __main__ - INFO - Pub/Subメッセージを送信しました。Message ID: 12
+2025-05-17 22:25:34,280 - __main__ - INFO - Pub/Subメッセージを送信しました。Message ID: 13
+2025-05-17 22:25:34,312 - __main__ - INFO - Pub/Subメッセージを送信しました。Message ID: 14
+2025-05-17 22:25:34,337 - __main__ - INFO - Pub/Subメッセージを送信しました。Message ID: 15
+2025-05-17 22:25:34,362 - __main__ - INFO - Pub/Subメッセージを送信しました。Message ID: 16
+2025-05-17 22:25:34,385 - __main__ - INFO - Pub/Subメッセージを送信しました。Message ID: 17
+2025-05-17 22:25:34,413 - __main__ - INFO - Pub/Subメッセージを送信しました。Message ID: 18
+2025-05-17 22:25:34,446 - __main__ - INFO - Pub/Subメッセージを送信しました。Message ID: 19
+2025-05-17 22:25:34,472 - __main__ - INFO - Pub/Subメッセージを送信しました。Message ID: 20
+2025-05-17 22:25:34,503 - __main__ - INFO - Pub/Subメッセージを送信しました。Message ID: 21
+2025-05-17 22:25:34,532 - __main__ - INFO - Pub/Subメッセージを送信しました。Message ID: 22
+2025-05-17 22:25:34,561 - __main__ - INFO - Pub/Subメッセージを送信しました。Message ID: 23
+2025-05-17 22:25:34,585 - __main__ - INFO - Pub/Subメッセージを送信しました。Message ID: 24
+2025-05-17 22:25:34,618 - __main__ - INFO - Pub/Subメッセージを送信しました。Message ID: 25
+2025-05-17 22:25:34,647 - __main__ - INFO - Pub/Subメッセージを送信しました。Message ID: 26
+2025-05-17 22:25:34,720 - __main__ - INFO - Pub/Subメッセージを送信しました。Message ID: 27
+2025-05-17 22:25:34,746 - __main__ - INFO - Pub/Subメッセージを送信しました。Message ID: 28
+2025-05-17 22:25:34,747 - __main__ - INFO - 動画の再生数の軽いデータをパースおよび保存しました: 24件
+2025-05-17 22:25:34,748 - __main__ - INFO - ユーザー @yurileeeee の再生数のクロールを完了しました。
+2025-05-17 22:25:34,749 - __main__ - INFO - ユーザー @kazugurashi の軽いデータのクロールを開始
+2025-05-17 22:25:34,749 - __main__ - DEBUG - ユーザー @kazugurashi のページに移動中...
+2025-05-17 22:25:38,711 - __main__ - DEBUG - ユーザー @kazugurashi のページに移動しました
+2025-05-17 22:25:38,712 - __main__ - DEBUG - 動画の再生数の軽いデータの前半を取得中...
+2025-05-17 22:25:51,464 - src.crawler.selenium_manager - INFO - Chromeドライバーを終了しました
+2025-05-17 22:25:51,466 - src.database.database - INFO - データベース接続を閉じました
+2025-05-17 22:25:51,467 - __main__ - INFO - ユーザーにより中断されました

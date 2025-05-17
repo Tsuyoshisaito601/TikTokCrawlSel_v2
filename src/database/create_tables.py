@@ -106,6 +106,23 @@ COLLATE = utf8mb4_0900_ai_ci;
         INDEX idx_crawled_at (crawled_at),
         INDEX idx_algorithm (crawling_algorithm)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+    """,
+    """
+    CREATE TABLE IF NOT EXISTS video_play_count_raw_data (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        video_url TEXT NOT NULL,
+        video_id VARCHAR(255) NOT NULL,
+        user_username VARCHAR(255) NOT NULL,
+        play_count_text VARCHAR(255),
+        play_count INT,
+        crawled_at DATETIME NOT NULL,
+        crawling_algorithm VARCHAR(50) NOT NULL,
+        created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        INDEX idx_video_id (video_id),
+        INDEX idx_user_username (user_username),
+        INDEX idx_crawled_at (crawled_at),
+        INDEX idx_algorithm (crawling_algorithm)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
     """
 ]
 
