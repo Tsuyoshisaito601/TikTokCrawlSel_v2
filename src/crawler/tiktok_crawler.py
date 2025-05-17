@@ -659,7 +659,7 @@ class TikTokCrawler:
         user_username = self.driver.find_element(By.CSS_SELECTOR, "[data-e2e='browse-username'],[data-e2e='user-title']").text
         user_nickname = self.driver.find_element(By.CSS_SELECTOR, "[data-e2e='browser-nickname'],[data-e2e='user-subtitle']").text
         video_title = self.driver.find_element(By.CSS_SELECTOR, "[data-e2e='browse-video-desc'],[data-e2e='video-desc']").text
-        post_time_element = self.driver.find_element(By.CSS_SELECTOR, "[data-e2e='video-author-uniqueid'] span:last-child, [data-e2e='browser-nickname'] span:last-child")
+        post_time_element = self.driver.find_element(By.CSS_SELECTOR, "a[class*='StyledAuthorAnchor'], [data-e2e='browser-nickname'] span:last-child")
         audio_url = self.driver.find_element(By.CSS_SELECTOR, "[data-e2e='browse-music'] a,[data-e2e='video-music']").get_attribute("href")
         try:
             # まず新しい形式を試す
@@ -679,11 +679,19 @@ class TikTokCrawler:
         
         # 取得したテキストを処理
         full_text = post_time_element.text
+
+        # 複数の区切りパターンに対応
         if " · " in full_text:
-            # 新形式の場合は分割して最後の部分を取得
+            # スペース付き中黒で区切られている場合
             post_time_text = full_text.split(" · ")[-1]
+        elif "\n·\n" in full_text:
+            # 改行付き中黒で区切られている場合
+            post_time_text = full_text.split("\n·\n")[-1]
+        elif "·" in full_text:
+            # 単なる中黒がある場合
+            post_time_text = full_text.split("·")[-1].strip()
         else:
-            # 旧形式の場合はそのまま使用
+            # 上記のいずれにも該当しない場合
             post_time_text = full_text
         logger.debug(f"動画の重いデータを取得しました: {video_url}")
 
