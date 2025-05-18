@@ -1468,7 +1468,7 @@ class TikTokCrawler:
             )
             for user in favorite_users:
                 try:
-                    self.crawl_play_count(user,max_videos_per_user=max_videos_per_user,new_flag=new_flag)
+                    self.crawl_play_count(user,max_videos_per_user=max_videos_per_user)
                 except KeyboardInterrupt:
                     raise
                 except Exception:
@@ -1482,7 +1482,7 @@ class TikTokCrawler:
 
             for user in favorite_users:
                 try:
-                    self.crawl_user(user, light_or_heavy=light_or_heavy, max_videos_per_user=max_videos_per_user, recrawl=recrawl)
+                    self.crawl_user(user, light_or_heavy=light_or_heavy, max_videos_per_user=max_videos_per_user, recrawl=recrawl,new_flag=new_flag)
                 except KeyboardInterrupt:
                     raise
                 except Exception:
