@@ -1356,7 +1356,7 @@ class TikTokCrawler:
                 if new_flag:
                     logger.info(f"ユーザー @{user.favorite_user_username} の既存の動画を取得します")
                     videos_needing_update = self.video_repo.get_existing_heavy_data_video_ids(user.favorite_user_username)
-                    update_video_ids = [int(parse_tiktok_video_url(v["video_url"])[0]) for v in videos_needing_update]
+                    update_video_ids = [int(video_id) for video_id in videos_needing_update]
                     # 更新対象の最大IDを取得（更新が必要な動画がない場合は0）
                     max_update_video_id = max(update_video_ids) if update_video_ids else 0
                         # より新しい動画を特定
