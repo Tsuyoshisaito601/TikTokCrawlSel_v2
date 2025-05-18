@@ -1365,7 +1365,7 @@ class TikTokCrawler:
                         video_id = int(video["video_id"])
                         video_url = video["video_url"]
                         # videos_needing_updateに含まれていない、かつより大きいvideo_idを持つものを追加
-                        if video_id > max_update_video_id and not any(v["video_url"] == video_url for v in videos_needing_update):
+                        if video_id > max_update_video_id and video_id not in [int(existing_id) for existing_id in videos_needing_update]:
                             new_videos.append(video)
                     
                     logger.info(f"{len(new_videos)}件の新しい動画が見つかりました")
