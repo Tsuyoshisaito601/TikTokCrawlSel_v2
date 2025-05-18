@@ -211,12 +211,12 @@ class VideoRepository:
             INSERT INTO video_heavy_raw_data (
                 video_id, video_url, video_thumbnail_url, video_title,
                 user_username, user_nickname, post_time_text, post_time,
-                audio_url, audio_info_text, audio_id, audio_title, audio_author_name,
+                audio_info_text, audio_id, audio_title, audio_author_name,
                 like_count_text, like_count,
                 comment_count_text, comment_count, collect_count_text, collect_count,
                 share_count_text, share_count, crawling_algorithm, crawled_at
             ) VALUES (
-                %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s,
+                %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s,
                 %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s
             ) ON DUPLICATE KEY UPDATE
                 video_url = VALUES(video_url),
@@ -226,7 +226,6 @@ class VideoRepository:
                 user_nickname = VALUES(user_nickname),
                 post_time_text = VALUES(post_time_text),
                 post_time = VALUES(post_time),
-                audio_url = VALUES(audio_url),
                 audio_info_text = VALUES(audio_info_text),
                 audio_id = VALUES(audio_id),
                 audio_title = VALUES(audio_title),
@@ -245,7 +244,7 @@ class VideoRepository:
         self.db.execute_query(query, (
             data.video_id, data.video_url, data.video_thumbnail_url, data.video_title,
             data.user_username, data.user_nickname, data.post_time_text, data.post_time,
-            data.audio_url, data.audio_info_text, data.audio_id, data.audio_title, data.audio_author_name,
+            data.audio_info_text, data.audio_id, data.audio_title, data.audio_author_name,
             data.like_count_text, data.like_count,
             data.comment_count_text, data.comment_count, data.collect_count_text, data.collect_count,
             data.share_count_text, data.share_count, data.crawling_algorithm, data.crawled_at
