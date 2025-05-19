@@ -1105,6 +1105,7 @@ class TikTokCrawler:
             message_data = {
                 "video_id": play_data["video_id"],
                 "video_url": play_data["video_url"],
+                "user_username": play_data["user_username"],
                 "play_count": parse_tiktok_number(play_data["play_count_text"])
             }
 
