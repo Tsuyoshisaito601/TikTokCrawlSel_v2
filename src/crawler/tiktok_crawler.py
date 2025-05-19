@@ -187,7 +187,7 @@ class TikTokCrawler:
                  video_repo: VideoRepository,
                  crawler_account_id: Optional[int] = None,
                  sadcaptcha_api_key: Optional[str] = None,
-                 device_type: str = "pc"):
+                 engagement_type: str = "like"):
         self.crawler_account_repo = crawler_account_repo
         self.favorite_user_repo = favorite_user_repo
         self.video_repo = video_repo
@@ -198,7 +198,7 @@ class TikTokCrawler:
         self.wait = None
         self.sadcaptcha_api_key = "fd31d51515ed18cadec7d4a522894997"
         self.login_restart_attempted = False        # ← 追加
-        self.device_type = device_type
+        self.engagement_type = engagement_type
 
     def __enter__(self):
         # クローラーアカウントを取得
@@ -211,14 +211,10 @@ class TikTokCrawler:
             if not self.crawler_account:
                 raise Exception("利用可能なクローラーアカウントがありません")
 
-        # デバイスタイプに応じてセットアップ
-        if self.device_type == "mobile":
-            self._setup_mobile_fingerprinter()
-        else:  # PC (デフォルト)
-            # Seleniumの設定
-            self.selenium_manager = SeleniumManager(self.crawler_account.proxy, self.sadcaptcha_api_key)
-            self.driver = self.selenium_manager.setup_driver()
-            self.wait = WebDriverWait(self.driver, 15)  # タイムアウトを15秒に変更
+        # Seleniumの設定
+        self.selenium_manager = SeleniumManager(self.crawler_account.proxy, self.sadcaptcha_api_key)
+        self.driver = self.selenium_manager.setup_driver()
+        self.wait = WebDriverWait(self.driver, 15)  # タイムアウトを15秒に変更
 
         # ログイン
         self._login()
@@ -318,28 +314,12 @@ class TikTokCrawler:
     # Args:
     #     username: ユーザー名
     #     device_type: デバイスタイプ（"pc" または "mobile"）
-    def navigate_to_user_page(self, username: str, device_type: str = "pc"):
+    def navigate_to_user_page(self, username: str):
         logger.debug(f"ユーザー @{username} のページに移動中...")
         self.driver.get(f"{self.BASE_URL}/@{username}")
         self.driver.execute_script("document.body.style.width=''")   # ← 各ページ後に一発
         self._random_sleep(2.0, 4.0)
         
-        # モバイルデバイスの場合、「後で」ボタンが表示されることがある
-        if device_type == "mobile":
-            try:
-                # モーダルが表示されるまで少し待機
-                WebDriverWait(self.driver, 5).until(
-                    EC.presence_of_element_located((By.ID, "login-modal"))
-                )
-                
-                # 「後で」ボタンを探してクリック
-                cancel_btn = self.driver.find_element(By.CSS_SELECTOR, "button[data-e2e='alt-middle-cta-cancel-btn']")
-                logger.debug("「後で」ボタンを見つけました。クリックします。")
-                self.driver.execute_script("arguments[0].click();", cancel_btn)
-                self._random_sleep(1.0, 2.0)
-            except (TimeoutException, NoSuchElementException):
-                # モーダルまたは「後で」ボタンが表示されない場合は何もしない
-                pass
 
         # user-page要素の存在を待機
         self.wait.until(
@@ -402,37 +382,15 @@ class TikTokCrawler:
             
             # スクロール処理をデバイスタイプに応じて分ける
             try:
-                if self.device_type == "mobile":
-                    # モバイル向けのスワイプスクロール
-                    from selenium.webdriver.common.action_chains import ActionChains
-                    from selenium.webdriver.common.actions.pointer_input import PointerInput
-                    from selenium.webdriver.common.actions import interaction
-
-                    # 画面の中央から下から上へスワイプ
-                    actions = ActionChains(self.driver)
-                    actions.w3c_actions = ActionChains(self.driver).w3c_actions
-                    
-                    # スワイプの開始点と終了点
-                    start_x = 195  # 画面の横幅の中央 (390/2)
-                    start_y = 700  # 画面の下部
-                    end_y = 300    # スワイプの終点
-                    
-                    # スワイプ操作を実行
-                    actions.w3c_actions.pointer_action.move_to_location(start_x, start_y)
-                    actions.w3c_actions.pointer_action.pointer_down()
-                    actions.w3c_actions.pointer_action.move_to_location(start_x, end_y)
-                    actions.w3c_actions.pointer_action.pointer_up()
-                    actions.perform()
-                else:
-                    # PC向けのスクロール
-                    final_target_scroll = self.driver.execute_script("return document.body.scrollHeight - 200;")
-                    current_scroll = self.driver.execute_script("return window.pageYOffset;")
-                    scroll_step = (final_target_scroll - current_scroll) / 3
-                    
-                    for i in range(3):
-                        target_scroll = current_scroll + scroll_step * (i + 1)
-                        self.driver.execute_script(f"window.scrollTo({{top: {target_scroll}, left: 0, behavior: 'smooth'}});")
-                        self._random_sleep(0.3, 0.7)
+                # PC向けのスクロール
+                final_target_scroll = self.driver.execute_script("return document.body.scrollHeight - 200;")
+                current_scroll = self.driver.execute_script("return window.pageYOffset;")
+                scroll_step = (final_target_scroll - current_scroll) / 3
+                
+                for i in range(3):
+                    target_scroll = current_scroll + scroll_step * (i + 1)
+                    self.driver.execute_script(f"window.scrollTo({{top: {target_scroll}, left: 0, behavior: 'smooth'}});")
+                    self._random_sleep(0.3, 0.7)
             
             except Exception as e:
                 logger.debug(f"スクロール中にエラーが発生しました: {e}")
@@ -515,7 +473,7 @@ class TikTokCrawler:
     # Args:
     #     max_videos: 取得する動画の最大数
     # Returns: 動画の再生数の軽いデータの前半(辞書型)のリスト
-    def get_video_play_count_datas_from_user_page(self, max_videos: int = 20) -> List[Dict[str, str]]:
+    def get_video_play_count_datas_from_user_page(self, max_videos: int = 100) -> List[Dict[str, str]]:
         logger.debug(f"動画の再生数の軽いデータの前半を取得中...")
         video_stats = []
         self._random_sleep(15.0, 20.0)
@@ -1560,10 +1518,10 @@ def main():
         help="既にクロール済みの動画を再クロールする (デフォルト: False)"
     )
     parser.add_argument(
-        "--device-type",
-        choices=["pc", "mobile"],
-        default="pc",
-        help="デバイスタイプ (デフォルト: pc)"
+        "--engagement-type",
+        choices=["like", "play"],
+        default="like",
+        help="クロール対象のデータの種類 (デフォルト: like)"
     )
     parser.add_argument(
         "--new",
@@ -1587,14 +1545,13 @@ def main():
             video_repo=video_repo,
             crawler_account_id=args.crawler_account_id,
             sadcaptcha_api_key=os.getenv("SADCAPTCHA_API_KEY"),  # APIキーを設定
-            device_type=args.device_type
         ) as crawler:
             crawler.crawl_favorite_users(
                 light_or_heavy=args.mode,
                 max_videos_per_user=args.max_videos_per_user,
                 max_users=args.max_users,
                 recrawl=args.recrawl,
-                device_type=args.device_type,
+                engagement_type=args.engagement_type,
                 new_flag=args.new
             )
 
