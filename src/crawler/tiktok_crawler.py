@@ -1417,9 +1417,9 @@ class TikTokCrawler:
     #     max_videos_per_user: 1ユーザーあたりの動画数
     #     max_users: 1クロール対象のユーザー数
     #     recrawl: 既に重いデータを取得済みの動画を再取得するかどうか
-    def crawl_favorite_users(self, light_or_heavy: str = "both", max_videos_per_user: int = 100, max_users: int = 10, recrawl: bool = True, device_type: str = "pc",new_flag: bool = False):
+    def crawl_favorite_users(self, light_or_heavy: str = "both", max_videos_per_user: int = 100, max_users: int = 10, recrawl: bool = True, engagement_type: str = "like",new_flag: bool = False):
         logger.info(f"クロール対象のお気に入りユーザー{max_users}件に対し{light_or_heavy}データのクロールを行います")
-        if device_type == "mobile":
+        if engagement_type == "play":
             favorite_users = self.favorite_user_repo.get_favorite_users_by_video_crawler_id(
                 self.crawler_account.video_crawler_id,
                 limit=max_users
@@ -1449,7 +1449,7 @@ class TikTokCrawler:
         
         logger.info(f"クロール対象のお気に入りユーザー{len(favorite_users)}件に対し{light_or_heavy}データのクロールを完了しました")
 
-    def crawl_play_count(self, user: FavoriteUser, max_videos_per_user: int = 21):
+    def crawl_play_count(self, user: FavoriteUser, max_videos_per_user: int = 100):
         logger.info(f"ユーザー @{user.favorite_user_username} の軽いデータのクロールを開始")
         try:
             self.navigate_to_user_page(user.favorite_user_username)
@@ -1465,21 +1465,6 @@ class TikTokCrawler:
 
         self.parse_and_save_play_count_datas(light_play_datas)
         logger.info(f"ユーザー @{user.favorite_user_username} の再生数のクロールを完了しました。")
-
-    def _setup_mobile_fingerprinter(self):
-        """モバイル用のfingerprinterをセットアップする"""
-        logger.info("モバイル用fingerprinterをセットアップします...")
-        
-        # モバイルデバイスタイプでSeleniumManagerを初期化
-        self.selenium_manager = SeleniumManager(self.crawler_account.proxy, self.sadcaptcha_api_key, device_type="mobile")
-        
-        # ドライバーをセットアップ
-        self.driver = self.selenium_manager.setup_driver()
-        
-        # 待機時間を設定
-        self.wait = WebDriverWait(self.driver, 15)
-        
-        logger.info("モバイル用fingerprinterのセットアップが完了しました")
 
 
 def main():
