@@ -479,7 +479,7 @@ class TikTokCrawler:
         self._random_sleep(15.0, 20.0)
         
         self.scroll_user_page(max_videos)
-        video_elements = self.driver.find_elements(By.CSS_SELECTOR, "[data-e2e='video-item']")
+        video_elements = self.driver.find_elements(By.CSS_SELECTOR, "[data-e2e='user-post-item']")
 
         logger.debug(f"動画の再生数を求めて{len(video_elements[:max_videos])}本の動画要素を走査します")
         for video_element in video_elements[:max_videos]:
