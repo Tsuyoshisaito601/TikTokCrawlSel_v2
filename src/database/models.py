@@ -22,6 +22,7 @@ class FavoriteUser:
     last_crawled_at: Optional[datetime] 
     is_new_account: bool
     video_crawler_id: Optional[int]
+    nickname: Optional[str]
 
 @dataclass
 class VideoHeavyRawData:
@@ -34,7 +35,6 @@ class VideoHeavyRawData:
     user_nickname: str = ""
     post_time_text: str = ""
     post_time: Optional[datetime] = None  # パースできないかもしれない
-    audio_url: Optional[str] = None
     audio_info_text: Optional[str] = None
     audio_id: Optional[str] = None
     audio_title: Optional[str] = None

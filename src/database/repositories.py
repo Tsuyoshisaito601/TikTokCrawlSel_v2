@@ -93,7 +93,7 @@ class FavoriteUserRepository:
         """クロール対象のお気に入りアカウントを取得"""
         query = """
             SELECT id, favorite_user_username, crawler_account_id,
-                   favorite_user_is_alive, crawl_priority, last_crawled_at, is_new_account,
+                   favorite_user_is_alive, crawl_priority, last_crawled_at, is_new_account,nickname,
                    video_crawler_id
             FROM account_list
             WHERE crawler_account_id = %s
@@ -120,7 +120,8 @@ class FavoriteUserRepository:
                 crawl_priority=row[4],
                 last_crawled_at=row[5],
                 is_new_account=row[6],
-                video_crawler_id=row[7]
+                video_crawler_id=row[7],
+                nickname=row[8]
             )
             for row in rows
         ]
@@ -129,7 +130,7 @@ class FavoriteUserRepository:
         """クロール対象のお気に入りアカウントを取得"""
         query = """
             SELECT id, favorite_user_username, crawler_account_id,
-                   favorite_user_is_alive, crawl_priority, last_crawled_at, is_new_account,
+                   favorite_user_is_alive, crawl_priority, last_crawled_at, is_new_account,nickname,
                    video_crawler_id
             FROM account_list
             WHERE video_crawler_id = %s
@@ -156,12 +157,20 @@ class FavoriteUserRepository:
                 crawl_priority=row[4],
                 last_crawled_at=row[5],
                 is_new_account=row[6],
-                video_crawler_id=row[7]
+                video_crawler_id=row[7],
+                nickname=row[8]
             )
             for row in rows
         ]
 
-    
+    def save_favorite_user_nickname(self, user_username: str, user_nickname: str):
+        """お気に入りアカウントのニックネームを保存"""
+        query = """
+            INSERT INTO account_list (favorite_user_username, nickname)
+            VALUES (%s, %s)
+            ON DUPLICATE KEY UPDATE
+        """
+        self.db.execute_query(query, (user_username, user_nickname))
 
     def update_favorite_user_last_crawled(self, username: str, last_crawled_at: datetime):
         """お気に入りアカウントの最終クロール時間を更新"""
