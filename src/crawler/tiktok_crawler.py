@@ -614,8 +614,6 @@ class TikTokCrawler:
         logger.debug(f"動画の重いデータを取得中...")
     
         video_url = self.driver.current_url
-        user_username = self.driver.find_element(By.CSS_SELECTOR, "[data-e2e='browse-username'],[data-e2e='user-title']").text
-        user_nickname = self.driver.find_element(By.CSS_SELECTOR, "[data-e2e='browser-nickname'],[data-e2e='user-subtitle']").text
         video_title = self.driver.find_element(By.CSS_SELECTOR, "[data-e2e='browse-video-desc'],[data-e2e='video-desc']").text
         post_time_element = self.driver.find_element(By.CSS_SELECTOR, "a[class*='StyledAuthorAnchor'], [data-e2e='browser-nickname'] span:last-child")
         # audio_url = self.driver.find_element(By.CSS_SELECTOR, "[data-e2e='browse-music'] a,[data-e2e='video-music']").get_attribute("href")
@@ -655,8 +653,6 @@ class TikTokCrawler:
 
         return {
             "video_url": video_url,
-            "user_username": user_username,
-            "user_nickname": user_nickname,
             "video_title": video_title,
             "post_time_text": post_time_text,
             "audio_info_text": audio_info_text,
@@ -669,8 +665,6 @@ class TikTokCrawler:
         logger.debug(f"動画の重いデータを取得中...")
     
         video_url = self.driver.current_url
-        user_username = self.driver.find_element(By.CSS_SELECTOR, "[data-e2e='browse-username']").text
-        user_nickname = self.driver.find_element(By.CSS_SELECTOR, "[data-e2e='browser-nickname']").text
         video_title = self.driver.find_element(By.CSS_SELECTOR, "[data-e2e='browse-video-desc']").text
         post_time_text = self.driver.find_element(By.CSS_SELECTOR, "[data-e2e='browser-nickname'] span:last-child").text
         audio_info_text = self.driver.find_element(By.CSS_SELECTOR, "[data-e2e='browse-music'] .css-pvx3oa-DivMusicText").text
@@ -682,8 +676,6 @@ class TikTokCrawler:
 
         return {
             "video_url": video_url,
-            "user_username": user_username,
-            "user_nickname": user_nickname,
             "video_title": video_title,
             "post_time_text": post_time_text,
             "audio_info_text": audio_info_text,
@@ -937,7 +929,7 @@ class TikTokCrawler:
     # Args:
     #     heavy_data: 動画の重いデータ(辞書型)
     #     thumbnail_url: 動画のサムネイル画像のURL
-    def parse_and_save_video_heavy_data(self, heavy_data: Dict, thumbnail_url: str, video_alt_info_text: Optional[str] = None):
+    def parse_and_save_video_heavy_data(self, heavy_data: Dict, thumbnail_url: str, video_alt_info_text: Optional[str] = None, user_username: str = None, user_nickname: str = None):
         logger.debug(f"動画の重いデータをパースおよび保存中...: {heavy_data['video_url']}")
 
         video_id, _ = parse_tiktok_video_url(heavy_data["video_url"])
@@ -958,8 +950,8 @@ class TikTokCrawler:
             id=None,
             video_url=heavy_data["video_url"],
             video_id=video_id,
-            user_username=heavy_data["user_username"],
-            user_nickname=heavy_data["user_nickname"],
+            user_username=user_username,
+            user_nickname=user_nickname,
             video_thumbnail_url=thumbnail_url,
             video_title=heavy_data["video_title"],
             post_time_text=heavy_data.get("post_time_text"),
@@ -990,8 +982,8 @@ class TikTokCrawler:
         message_data = {
             "video_id": video_id,
             "video_url": heavy_data["video_url"],
-            "user_username": heavy_data["user_username"],
-            "user_nickname": heavy_data["user_nickname"],
+            "user_username": user_username,
+            "user_nickname": user_nickname,
             "video_thumbnail_url": thumbnail_url,
             "video_title": video_alt_info_text,
             "post_time": post_time.isoformat() if post_time else None,
@@ -1032,6 +1024,14 @@ class TikTokCrawler:
             writer.writeheader()
             writer.writerows(data)
         logger.debug(f"{prefix}を{csv_path}に出力しました: {len(data)}件")
+
+
+    # ユーザー名とニックネームのデータを取得して保存する
+    def get_and_save_user_name_datas(self, user_username: str):
+        logger.debug(f"ユーザー名のデータを取得して保存中...")
+        user_nickname = self.driver.find_element(By.CSS_SELECTOR, "[data-e2e='user-subtitle']").text
+        self.favorite_user_repo.save_favorite_user_nickname(user_username, user_nickname)
+        logger.debug(f"ユーザー名のデータを取得して保存しました: {user_username}, {user_nickname}")
 
 
     # 動画の軽いデータをパースおよび保存する
@@ -1184,7 +1184,7 @@ class TikTokCrawler:
                     self.navigate_to_video_page(light_like_data["video_url"])
                     try:
                         heavy_data = self.get_video_heavy_data_from_video_page()
-                        self.parse_and_save_video_heavy_data(heavy_data, light_like_data["video_thumbnail_url"], light_like_data.get("play_count"),light_like_data.get("video_alt_info_text"))
+                        self.parse_and_save_video_heavy_data(heavy_data, light_like_data["video_thumbnail_url"],light_like_data.get("video_alt_info_text"),user.favorite_user_username,user.nickname)
                         self._random_sleep(10.0, 20.0) # こんくらいは見たほうがいいんじゃないかな未検証だけど
                     except Exception:
                         logger.exception(f"動画ページを開いた状態でエラーが発生しました。動画ページを閉じてユーザーページに戻ります。")
@@ -1223,7 +1223,9 @@ class TikTokCrawler:
                     self.parse_and_save_video_light_datas(light_like_datas)
                     # self.navigate_to_user_page_from_video_page()
                     
-                    logger.info(f"バッチの軽いデータのクロールを完了しました。重いデータのクロールを開始します。")
+                    logger.info(f"バッチの軽いデータのクロールを完了しました。ユーザー名のクロールを開始します。")
+                    self.get_and_save_user_name_datas(user.favorite_user_username)
+
                     
 
                     # play_count_map = {}
@@ -1256,7 +1258,9 @@ class TikTokCrawler:
                             else:                            
                                 heavy_data = self.get_video_heavy_data_from_video_page()
 
-                            self.parse_and_save_video_heavy_data(heavy_data, light_like_data["video_thumbnail_url"],light_like_data.get("video_alt_info_text"))
+
+
+                            self.parse_and_save_video_heavy_data(heavy_data, light_like_data["video_thumbnail_url"],light_like_data.get("video_alt_info_text"),user.favorite_user_username,user.nickname)
                             
                             # 投稿日時を取得して記録
                             # post_time = parse_tiktok_time(heavy_data.get("post_time_text"), datetime.now())
@@ -1346,7 +1350,7 @@ class TikTokCrawler:
                                 heavy_data = self.get_video_heavy_data_from_direct_access()
                             else:                            
                                 heavy_data = self.get_video_heavy_data_from_video_page()
-                            self.parse_and_save_video_heavy_data(heavy_data, video["video_thumbnail_url"],video.get("video_alt_info_text"))
+                            self.parse_and_save_video_heavy_data(heavy_data, video["video_thumbnail_url"],video.get("video_alt_info_text"),user.favorite_user_username,user.nickname)
                             self._random_sleep(10.0, 20.0)
                         except KeyboardInterrupt:
                             raise
@@ -1386,7 +1390,7 @@ class TikTokCrawler:
                                 heavy_data = self.get_video_heavy_data_from_direct_access()
                             else:                            
                                 heavy_data = self.get_video_heavy_data_from_video_page()
-                            self.parse_and_save_video_heavy_data(heavy_data, video["video_thumbnail_url"],video.get("video_alt_info_text"))
+                            self.parse_and_save_video_heavy_data(heavy_data, video["video_thumbnail_url"],video.get("video_alt_info_text"),user.favorite_user_username,user.nickname)
                             self._random_sleep(10.0, 20.0)
                         except KeyboardInterrupt:
                             raise

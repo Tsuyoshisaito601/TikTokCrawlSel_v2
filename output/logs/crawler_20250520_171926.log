@@ -1,0 +1,10 @@
+2025-05-20 17:19:27,661 - src.crawler.selenium_manager - INFO - SeleniumManager初期化: device_type=pc
+2025-05-20 17:19:27,662 - src.crawler.selenium_manager - INFO - PC用の設定を適用します
+2025-05-20 17:19:31,813 - src.crawler.selenium_manager - INFO - CAPTCHA Solver付きのドライバーを作成します
+2025-05-20 17:19:32,149 - src.crawler.selenium_manager - INFO - Chromeドライバーの設定が完了しました
+2025-05-20 17:19:53,761 - src.crawler.selenium_manager - DEBUG - captcha_present=True
+2025-05-20 17:19:53,763 - src.crawler.selenium_manager - INFO - [1/10] CAPTCHA 解決を試行中…
+2025-05-20 17:19:59,826 - src.crawler.selenium_manager - DEBUG - solve_CaptchaType.ROTATE_V2() => None
+2025-05-20 17:19:59,873 - src.crawler.selenium_manager - INFO - CAPTCHA まだ残存。3s 待って再試行
+2025-05-20 17:20:02,875 - src.crawler.selenium_manager - INFO - [2/10] CAPTCHA 解決を試行中…
+2025-05-20 17:20:41,491 - src.crawler.selenium_manager - ERROR - CAPTCHA 解決中に例外が発生: Neither puzzle, shapes, or rotate captcha was present.
