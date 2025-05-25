@@ -120,8 +120,8 @@ class FavoriteUserRepository:
                 crawl_priority=row[4],
                 last_crawled_at=row[5],
                 is_new_account=row[6],
-                video_crawler_id=row[7],
-                nickname=row[8]
+                nickname=row[7],
+                video_crawler_id=row[8]
             )
             for row in rows
         ]
@@ -157,8 +157,8 @@ class FavoriteUserRepository:
                 crawl_priority=row[4],
                 last_crawled_at=row[5],
                 is_new_account=row[6],
-                video_crawler_id=row[7],
-                nickname=row[8]
+                nickname=row[7],
+                video_crawler_id=row[8]
             )
             for row in rows
         ]

@@ -1208,7 +1208,7 @@ class TikTokCrawler:
         if light_or_heavy == "both":
             if user.is_new_account == True:
                 logger.info(f"ユーザー @{user.favorite_user_username} の軽いデータののクロールを開始")
-                max_videos_per_batch = 30  # 1回のバッチで取得する動画数
+                max_videos_per_batch = 100  # 1回のバッチで取得する動画数
                 # target_date = datetime(2025, 1, 1)  # この日付より前の動画が見つかるまでクロール
                 processed_urls = set()  # 処理済みのURLを記録
 
