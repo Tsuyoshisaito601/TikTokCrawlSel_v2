@@ -10,7 +10,6 @@ class CrawlerAccount:
     proxy: Optional[str] # 未設定かもしれないので
     is_alive: bool
     last_crawled_at: Optional[datetime] # 初めてかもしれないので
-    video_crawler_id: Optional[int] 
 
 @dataclass
 class FavoriteUser:
@@ -21,7 +20,7 @@ class FavoriteUser:
     crawl_priority: int
     last_crawled_at: Optional[datetime] 
     is_new_account: bool
-    video_crawler_id: Optional[int]
+    play_count_crawler_id: Optional[int]
     nickname: Optional[str]
 
 @dataclass

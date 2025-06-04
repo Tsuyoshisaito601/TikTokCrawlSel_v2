@@ -203,14 +203,21 @@ class TikTokCrawler:
     def __enter__(self):
         # クローラーアカウントを取得
         if self.crawler_account_id is not None:
-            self.crawler_account = self.crawler_account_repo.get_crawler_account_by_id(self.crawler_account_id)
+            if self.engagement_type == "play":
+                # 再生数クロールの場合は、指定されたIDをplay_count_crawler_idとして使用
+                self.crawler_account = self.crawler_account_repo.get_play_count_crawler_account(self.crawler_account_id)
+            else:
+                # 通常のクロールの場合
+                self.crawler_account = self.crawler_account_repo.get_crawler_account_by_id(self.crawler_account_id)
+            
             if not self.crawler_account:
-                raise Exception(f"指定されたクローラーアカウント（ID: {self.crawler_account_id}）が見つかりません")
+                account_type = "play_count_crawler_id" if self.engagement_type == "play" else "id"
+                raise Exception(f"指定されたクローラーアカウント（{account_type}: {self.crawler_account_id}）が見つかりません")
         else:
             self.crawler_account = self.crawler_account_repo.get_an_available_crawler_account()
             if not self.crawler_account:
                 raise Exception("利用可能なクローラーアカウントがありません")
-
+        
         # Seleniumの設定
         self.selenium_manager = SeleniumManager(self.crawler_account.proxy, self.sadcaptcha_api_key)
         self.driver = self.selenium_manager.setup_driver()
@@ -219,11 +226,17 @@ class TikTokCrawler:
         # ログイン
         self._login()
 
-        # 最終クロール時間を更新
-        self.crawler_account_repo.update_crawler_account_last_crawled(
-            self.crawler_account.id,
-            datetime.now()
-        )
+        # 最終クロール時間を更新（engagement_typeに応じて適切なテーブルを更新）
+        if self.engagement_type == "play":
+            self.crawler_account_repo.update_play_count_crawler_account_last_crawled(
+                self.crawler_account.id,
+                datetime.now()
+            )
+        else:
+            self.crawler_account_repo.update_crawler_account_last_crawled(
+                self.crawler_account.id,
+                datetime.now()
+            )
         return self
 
     def __exit__(self, exc_type, exc_val, exc_tb):
@@ -1128,7 +1141,7 @@ class TikTokCrawler:
     #     light_or_heavy: "light"(軽いデータのみ), "heavy"(重いデータのみ), "both"(軽重両方)
     #     max_videos_per_user: 1ユーザーあたりの動画数
     #     recrawl: 既に重いデータを取得済みの動画を再取得するかどうか
-    def crawl_user(self, user: FavoriteUser, light_or_heavy: str = "both", max_videos_per_user: int = 100, recrawl: bool = False,new_flag: bool = False):
+    def crawl_user(self, user: FavoriteUser, light_or_heavy: str = "both", max_videos_per_user: int = 100, recrawl: bool = False):
         logger.info(f"ユーザー @{user.favorite_user_username} の{light_or_heavy}データのクロールを開始")
 
         try:
@@ -1314,94 +1327,45 @@ class TikTokCrawler:
                         break
 
             else:
-                # 既存の処理（新しいアカウントでない場合）
+                # 取得実績有アカウントの処理
 
-                if new_flag:
-                    logger.info(f"ユーザー @{user.favorite_user_username} の既存の動画を取得します")
-                    videos_needing_update = self.video_repo.get_existing_heavy_data_video_ids(user.favorite_user_username)
-                    update_video_ids = [int(video_id) for video_id in videos_needing_update]
-                    # 更新対象の最大IDを取得（更新が必要な動画がない場合は0）
-                    max_update_video_id = max(update_video_ids) if update_video_ids else 0
-                        # より新しい動画を特定
-                    new_videos = []
-                    for video in light_like_datas:
-                        video_id = int(video["video_id"])
-                        video_url = video["video_url"]
-                        # videos_needing_updateに含まれていない、かつより大きいvideo_idを持つものを追加
-                        if video_id > max_update_video_id and video_id not in [int(existing_id) for existing_id in videos_needing_update]:
-                            new_videos.append(video)
+                # 最新の動画URLを取得してビデオページに移動
+                # first_url = self.get_latest_video_url_from_user_page()
+                # self.navigate_to_video_page(first_url)
+                # self.navigate_to_video_page_creator_videos_tab()
+                # max_videos_per_batch = 50
+                # 軽いデータを取得
+                # light_play_datas = self.get_video_light_play_datas_from_video_page_creator_videos_tab(max_videos_per_batch + 10)
+                self.parse_and_save_video_light_datas(light_like_datas)
+                # self.navigate_to_user_page_from_video_page()
                     
-                    logger.info(f"{len(new_videos)}件の新しい動画が見つかりました")
+                # logger.info(f"バッチの軽いデータのクロールを完了しました。重いデータのクロールを開始します。")
+                # needs_update=1の動画を取得
+                logger.info(f"ユーザー @{user.favorite_user_username} の更新が必要な動画を取得します")
+                videos_needing_update = self.video_repo.get_videos_needing_update(user.favorite_user_username)
+                logger.info(f"{len(videos_needing_update)}件の動画の更新が必要です")
 
-                            # 新しい動画だけを処理対象とする
-                    target_videos = [
-                        {
-                            "video_url": v["video_url"],
-                            "video_id": v["video_id"],
-                            "video_thumbnail_url": v["video_thumbnail_url"],
-                            "video_alt_info_text": v.get("video_alt_info_text")
-                        } for v in new_videos
-                    ]
-                    logger.info(f"{len(target_videos)}件の新しい動画の重いデータのクロールを開始します")
-                    for video in target_videos:
+                # 重いデータを取得
+                logger.info(f"更新が必要な動画の重いデータのクロールを開始します")
+                for video in videos_needing_update:
+                    try:
+                        direct_access = self.navigate_to_video_page(video["video_url"])
+                        if direct_access:
+                            heavy_data = self.get_video_heavy_data_from_direct_access()
+                        else:                            
+                            heavy_data = self.get_video_heavy_data_from_video_page()
+                        self.parse_and_save_video_heavy_data(heavy_data, video["video_thumbnail_url"],video.get("video_alt_info_text"),user.favorite_user_username,user.nickname)
+                        self._random_sleep(10.0, 20.0)
+                    except KeyboardInterrupt:
+                        raise
+                    except Exception:
+                        logger.exception(f"動画 {video['video_url']} の重いデータのクロール中に失敗。スキップします")
+                        continue
+                    finally:
                         try:
-                            direct_access = self.navigate_to_video_page(video["video_url"])
-                            if direct_access:
-                                heavy_data = self.get_video_heavy_data_from_direct_access()
-                            else:                            
-                                heavy_data = self.get_video_heavy_data_from_video_page()
-                            self.parse_and_save_video_heavy_data(heavy_data, video["video_thumbnail_url"],video.get("video_alt_info_text"),user.favorite_user_username,user.nickname)
-                            self._random_sleep(10.0, 20.0)
-                        except KeyboardInterrupt:
-                            raise
+                            self.navigate_to_user_page_from_video_page()
                         except Exception:
-                            logger.exception(f"動画 {video['video_url']} の重いデータのクロール中に失敗。スキップします")
-                            continue
-                        finally:
-                            try:
-                                self.navigate_to_user_page_from_video_page()
-                            except Exception:
-                                logger.warning("ユーザーページへの戻りに失敗 (無視して続行)")
-                else:
-
-
-                    # 最新の動画URLを取得してビデオページに移動
-                    # first_url = self.get_latest_video_url_from_user_page()
-                    # self.navigate_to_video_page(first_url)
-                    # self.navigate_to_video_page_creator_videos_tab()
-                    # max_videos_per_batch = 50
-                    # 軽いデータを取得
-                    # light_play_datas = self.get_video_light_play_datas_from_video_page_creator_videos_tab(max_videos_per_batch + 10)
-                    self.parse_and_save_video_light_datas(light_like_datas)
-                    # self.navigate_to_user_page_from_video_page()
-                        
-                    # logger.info(f"バッチの軽いデータのクロールを完了しました。重いデータのクロールを開始します。")
-                    # needs_update=1の動画を取得
-                    logger.info(f"ユーザー @{user.favorite_user_username} の更新が必要な動画を取得します")
-                    videos_needing_update = self.video_repo.get_videos_needing_update(user.favorite_user_username)
-                    logger.info(f"{len(videos_needing_update)}件の動画の更新が必要です")
-
-                    # 重いデータを取得
-                    logger.info(f"更新が必要な動画の重いデータのクロールを開始します")
-                    for video in videos_needing_update:
-                        try:
-                            direct_access = self.navigate_to_video_page(video["video_url"])
-                            if direct_access:
-                                heavy_data = self.get_video_heavy_data_from_direct_access()
-                            else:                            
-                                heavy_data = self.get_video_heavy_data_from_video_page()
-                            self.parse_and_save_video_heavy_data(heavy_data, video["video_thumbnail_url"],video.get("video_alt_info_text"),user.favorite_user_username,user.nickname)
-                            self._random_sleep(10.0, 20.0)
-                        except KeyboardInterrupt:
-                            raise
-                        except Exception:
-                            logger.exception(f"動画 {video['video_url']} の重いデータのクロール中に失敗。スキップします")
-                            continue
-                        finally:
-                            try:
-                                self.navigate_to_user_page_from_video_page()
-                            except Exception:
-                                logger.warning("ユーザーページへの戻りに失敗 (無視して続行)")
+                            logger.warning("ユーザーページへの戻りに失敗 (無視して続行)")
 
             logger.info(f"ユーザー @{user.favorite_user_username} の重いデータのクロールを完了しました")
 
@@ -1422,11 +1386,11 @@ class TikTokCrawler:
     #     max_videos_per_user: 1ユーザーあたりの動画数
     #     max_users: 1クロール対象のユーザー数
     #     recrawl: 既に重いデータを取得済みの動画を再取得するかどうか
-    def crawl_favorite_users(self, light_or_heavy: str = "both", max_videos_per_user: int = 100, max_users: int = 10, recrawl: bool = True, engagement_type: str = "like",new_flag: bool = False):
+    def crawl_favorite_users(self, light_or_heavy: str = "both", max_videos_per_user: int = 100, max_users: int = 10, recrawl: bool = True, engagement_type: str = "like"):
         logger.info(f"クロール対象のお気に入りユーザー{max_users}件に対し{light_or_heavy}データのクロールを行います")
         if engagement_type == "play":
-            favorite_users = self.favorite_user_repo.get_favorite_users_by_video_crawler_id(
-                self.crawler_account.video_crawler_id,
+            favorite_users = self.favorite_user_repo.get_favorite_users_by_play_count_crawler_id(
+                self.crawler_account.id,
                 limit=max_users
             )
             for user in favorite_users:
@@ -1445,7 +1409,7 @@ class TikTokCrawler:
 
             for user in favorite_users:
                 try:
-                    self.crawl_user(user, light_or_heavy=light_or_heavy, max_videos_per_user=max_videos_per_user, recrawl=recrawl,new_flag=new_flag)
+                    self.crawl_user(user, light_or_heavy=light_or_heavy, max_videos_per_user=max_videos_per_user, recrawl=recrawl)
                 except KeyboardInterrupt:
                     raise
                 except Exception:
@@ -1513,12 +1477,7 @@ def main():
         default="like",
         help="クロール対象のデータの種類 (デフォルト: like)"
     )
-    parser.add_argument(
-        "--new",
-        action="store_true",
-        help="新しい動画（最新のvideo_idを持つ動画）のみをクロールする (デフォルト: False)"
-    )
-    
+
     args = parser.parse_args()
 
     # データベース接続の初期化
@@ -1535,14 +1494,14 @@ def main():
             video_repo=video_repo,
             crawler_account_id=args.crawler_account_id,
             sadcaptcha_api_key=os.getenv("SADCAPTCHA_API_KEY"),  # APIキーを設定
+            engagement_type=args.engagement_type
         ) as crawler:
             crawler.crawl_favorite_users(
                 light_or_heavy=args.mode,
                 max_videos_per_user=args.max_videos_per_user,
                 max_users=args.max_users,
                 recrawl=args.recrawl,
-                engagement_type=args.engagement_type,
-                new_flag=args.new
+                engagement_type=args.engagement_type
             )
 
 if __name__ == "__main__":
