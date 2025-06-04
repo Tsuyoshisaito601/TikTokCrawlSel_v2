@@ -13,7 +13,7 @@ class CrawlerAccountRepository:
     def get_an_available_crawler_account(self) -> Optional[CrawlerAccount]:
         """利用可能なクローラーアカウントを1つ取得(使ってない順)"""
         query = """
-            SELECT id, username, password, proxy, is_alive, last_crawled_at,video_crawler_id
+            SELECT id, username, password, proxy, is_alive, last_crawled_at
             FROM crawler_accounts
             WHERE is_alive = TRUE
             ORDER BY 
@@ -37,14 +37,22 @@ class CrawlerAccountRepository:
             password=row[2],
             proxy=row[3],
             is_alive=row[4],
-            last_crawled_at=row[5],
-            video_crawler_id=row[6]
+            last_crawled_at=row[5]
         )
 
     def update_crawler_account_last_crawled(self, crawler_account_id: int, last_crawled_at: datetime):
         """クローラーアカウントの最終クロール時間を更新"""
         query = """
             UPDATE crawler_accounts
+            SET last_crawled_at = %s
+            WHERE id = %s
+        """
+        self.db.execute_query(query, (last_crawled_at, crawler_account_id))
+
+    def update_play_count_crawler_account_last_crawled(self, crawler_account_id: int, last_crawled_at: datetime):
+        """再生数クローラーアカウントの最終クロール時間を更新"""
+        query = """
+            UPDATE play_count_crawler_accounts
             SET last_crawled_at = %s
             WHERE id = %s
         """
@@ -60,7 +68,7 @@ class CrawlerAccountRepository:
             CrawlerAccountオブジェクト。見つからない場合はNone。
         """
         query = """
-            SELECT id, username, password, proxy, is_alive, last_crawled_at,video_crawler_id
+            SELECT id, username, password, proxy, is_alive, last_crawled_at
             FROM crawler_accounts
             WHERE id = %s
             AND is_alive = TRUE
@@ -79,11 +87,33 @@ class CrawlerAccountRepository:
             password=row[2],
             proxy=row[3],
             is_alive=row[4],
-            last_crawled_at=row[5],
-            video_crawler_id=row[6]
+            last_crawled_at=row[5]
         )
 
-    
+    def get_play_count_crawler_account(self, play_count_crawler_id: int) -> Optional[CrawlerAccount]:
+        """指定されたplay_count_crawler_idを持つクローラーアカウントを取得する"""
+        query = """
+            SELECT id, username, password, proxy, is_alive, last_crawled_at
+            FROM play_count_crawler_accounts
+            WHERE id = %s
+            AND is_alive = TRUE
+            LIMIT 1
+        """
+        cursor = self.db.execute_query(query, (play_count_crawler_id,))
+        row = cursor.fetchone()
+        cursor.close()
+
+        if not row:
+            return None
+
+        return CrawlerAccount(
+            id=row[0],
+            username=row[1],
+            password=row[2],
+            proxy=row[3],
+            is_alive=row[4],
+            last_crawled_at=row[5]
+        )
 
 class FavoriteUserRepository:
     def __init__(self, db: Database):
@@ -94,7 +124,7 @@ class FavoriteUserRepository:
         query = """
             SELECT id, favorite_user_username, crawler_account_id,
                    favorite_user_is_alive, crawl_priority, last_crawled_at, is_new_account,nickname,
-                   video_crawler_id
+                   play_count_crawler_id
             FROM account_list
             WHERE crawler_account_id = %s
             AND favorite_user_is_alive = TRUE
@@ -121,19 +151,19 @@ class FavoriteUserRepository:
                 last_crawled_at=row[5],
                 is_new_account=row[6],
                 nickname=row[7],
-                video_crawler_id=row[8]
+                play_count_crawler_id=row[8]
             )
             for row in rows
         ]
     
-    def get_favorite_users_by_video_crawler_id(self, video_crawler_id: int, limit: int = 1000) -> List[FavoriteUser]:
+    def get_favorite_users_by_play_count_crawler_id(self, play_count_crawler_id: int, limit: int = 1000) -> List[FavoriteUser]:
         """クロール対象のお気に入りアカウントを取得"""
         query = """
             SELECT id, favorite_user_username, crawler_account_id,
                    favorite_user_is_alive, crawl_priority, last_crawled_at, is_new_account,nickname,
-                   video_crawler_id
+                   play_count_crawler_id
             FROM account_list
-            WHERE video_crawler_id = %s
+            WHERE play_count_crawler_id = %s
             AND favorite_user_is_alive = TRUE
             ORDER BY 
                 CASE 
@@ -144,7 +174,7 @@ class FavoriteUserRepository:
                 last_crawled_at ASC
             LIMIT %s
         """
-        cursor = self.db.execute_query(query, (video_crawler_id, limit))
+        cursor = self.db.execute_query(query, (play_count_crawler_id, limit))
         rows = cursor.fetchall()
         cursor.close()
 
@@ -158,7 +188,7 @@ class FavoriteUserRepository:
                 last_crawled_at=row[5],
                 is_new_account=row[6],
                 nickname=row[7],
-                video_crawler_id=row[8]
+                play_count_crawler_id=row[8]
             )
             for row in rows
         ]
@@ -169,6 +199,7 @@ class FavoriteUserRepository:
             INSERT INTO account_list (favorite_user_username, nickname)
             VALUES (%s, %s)
             ON DUPLICATE KEY UPDATE
+                nickname = VALUES(nickname)
         """
         self.db.execute_query(query, (user_username, user_nickname))
 
