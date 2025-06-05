@@ -1040,11 +1040,12 @@ class TikTokCrawler:
 
 
     # ユーザー名とニックネームのデータを取得して保存する
-    def get_and_save_user_name_datas(self, user_username: str):
+    def get_and_save_user_name_datas(self, user_username: str) -> str:
         logger.debug(f"ユーザー名のデータを取得して保存中...")
         user_nickname = self.driver.find_element(By.CSS_SELECTOR, "[data-e2e='user-subtitle']").text
         self.favorite_user_repo.save_favorite_user_nickname(user_username, user_nickname)
         logger.debug(f"ユーザー名のデータを取得して保存しました: {user_username}, {user_nickname}")
+        return user_nickname
 
 
     # 動画の軽いデータをパースおよび保存する
@@ -1237,7 +1238,7 @@ class TikTokCrawler:
                     # self.navigate_to_user_page_from_video_page()
                     
                     logger.info(f"バッチの軽いデータのクロールを完了しました。ユーザー名のクロールを開始します。")
-                    self.get_and_save_user_name_datas(user.favorite_user_username)
+                    current_nickname = self.get_and_save_user_name_datas(user.favorite_user_username)
 
                     
 
@@ -1273,7 +1274,7 @@ class TikTokCrawler:
 
 
 
-                            self.parse_and_save_video_heavy_data(heavy_data, light_like_data["video_thumbnail_url"],light_like_data.get("video_alt_info_text"),user.favorite_user_username,user.nickname)
+                            self.parse_and_save_video_heavy_data(heavy_data, light_like_data["video_thumbnail_url"],light_like_data.get("video_alt_info_text"),user.favorite_user_username,current_nickname)
                             
                             # 投稿日時を取得して記録
                             # post_time = parse_tiktok_time(heavy_data.get("post_time_text"), datetime.now())
