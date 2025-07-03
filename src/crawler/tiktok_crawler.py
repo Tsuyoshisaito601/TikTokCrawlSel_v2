@@ -258,6 +258,7 @@ class TikTokCrawler:
     def _login(self):
         logger.info(f"クロール用アカウント{self.crawler_account.username}でTikTokにログイン中...")
         self.driver.get(f"{self.BASE_URL}/login/phone-or-email/email")
+        self.driver.execute_script("document.body.style.width=''")   # ← 画面中央寄せ処理を追加
         self._random_sleep(2.0, 4.0)
 
         # ログインフォームの要素を待機
@@ -320,6 +321,11 @@ class TikTokCrawler:
     # TikTokユーザーが見つからない（アカウントが削除されている等）場合の例外
     # ユーザー単位の関数で最も大きいところで処置完了するように設計しましょう
     class TikTokUserNotFoundException(Exception):
+        pass
+
+    # TikTok動画が見つからない（動画が削除されている等）場合の例外
+    # 動画単位の関数で最も大きいところで処置完了するように設計しましょう
+    class TikTokVideoNotFoundException(Exception):
         pass
 
     # ユーザーページに移動する
@@ -576,6 +582,20 @@ class TikTokCrawler:
                 # ページが読み込まれるまで十分に待機
                 self._random_sleep(3.0, 5.0)
                 
+                # 動画削除済み確認用の要素を探す
+                try:
+                    error_container = self.driver.find_element(By.CSS_SELECTOR, "div[class*='-DivErrorContainer']")
+                    error_text = error_container.find_element(By.CSS_SELECTOR, "p[class*='-PTitle']").text
+
+                    if error_text == "動画は現在ご利用できません":
+                        video_id, _ = parse_tiktok_video_url(video_url)
+                        logger.info(f"動画 {video_url} は削除されたようです。データベースのis_aliveをFalseに更新します。")
+                        self.video_repo.update_video_light_data_is_alive(video_id, False)
+                        raise self.TikTokVideoNotFoundException(f"動画 {video_url} は存在しません")
+                except NoSuchElementException:
+                    # 削除確認要素が見つからない場合は正常な動画ページとして処理を続行
+                    pass
+                
                 # 複数の可能性のある要素のいずれかが表示されるまで待機
                 try:
                     if direct_access:
@@ -607,6 +627,8 @@ class TikTokCrawler:
                         return direct_access
                     raise
                 
+            except self.TikTokVideoNotFoundException:
+                raise
             except Exception as e:
                 retry_count += 1
                 logger.warning(f"動画ページへの移動に失敗 (試行 {retry_count}/{max_retries}): {str(e)}")
@@ -1515,3 +1537,4 @@ if __name__ == "__main__":
     except Exception:
         logger.exception("予期しないエラーが発生しました")
         sys.exit(1)
+

@@ -358,7 +358,8 @@ class VideoRepository:
             SELECT video_url, video_thumbnail_url,video_alt_info_text
             FROM video_light_raw_data
             WHERE user_username = %s
-            AND needs_update = 1
+            AND needs_update = 1,
+            AND is_alive = 1
         """
         cursor = self.db.execute_query(query, (user_username,))
         rows = cursor.fetchall()
