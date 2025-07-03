@@ -258,6 +258,7 @@ class TikTokCrawler:
     def _login(self):
         logger.info(f"クロール用アカウント{self.crawler_account.username}でTikTokにログイン中...")
         self.driver.get(f"{self.BASE_URL}/login/phone-or-email/email")
+        self.driver.execute_script("document.body.style.width=''")   # ← 画面中央寄せ処理を追加
         self._random_sleep(2.0, 4.0)
 
         # ログインフォームの要素を待機
@@ -1536,3 +1537,4 @@ if __name__ == "__main__":
     except Exception:
         logger.exception("予期しないエラーが発生しました")
         sys.exit(1)
+
