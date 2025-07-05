@@ -258,7 +258,34 @@ class TikTokCrawler:
     def _login(self):
         logger.info(f"クロール用アカウント{self.crawler_account.username}でTikTokにログイン中...")
         self.driver.get(f"{self.BASE_URL}/login/phone-or-email/email")
-        self.driver.execute_script("document.body.style.width=''")   # ← 画面中央寄せ処理を追加
+        
+        # 画面の左寄せ処理を改善
+        self.driver.execute_script("""
+            document.body.style.width = '';
+            document.body.style.margin = '0';
+            document.body.style.padding = '0';
+            document.documentElement.style.margin = '0';
+            document.documentElement.style.padding = '0';
+            
+            // メインコンテナを左寄せにする
+            const containers = document.querySelectorAll('div[class*="container"], div[class*="Container"]');
+            containers.forEach(container => {
+                container.style.margin = '0';
+                container.style.padding = '0';
+                container.style.maxWidth = 'none';
+                container.style.width = '100%';
+            });
+            
+            // ログインフォームを左寄せにする
+            const forms = document.querySelectorAll('form, div[class*="form"], div[class*="Form"]');
+            forms.forEach(form => {
+                form.style.margin = '0';
+                form.style.padding = '20px';
+                form.style.maxWidth = 'none';
+                form.style.width = 'auto';
+            });
+        """)
+        
         self._random_sleep(2.0, 4.0)
 
         # ログインフォームの要素を待機
