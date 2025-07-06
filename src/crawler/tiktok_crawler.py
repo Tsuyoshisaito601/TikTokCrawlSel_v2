@@ -187,7 +187,8 @@ class TikTokCrawler:
                  video_repo: VideoRepository,
                  crawler_account_id: Optional[int] = None,
                  sadcaptcha_api_key: Optional[str] = None,
-                 engagement_type: str = "like"):
+                 engagement_type: str = "like",
+                 device_type: str = "pc"):
         self.crawler_account_repo = crawler_account_repo
         self.favorite_user_repo = favorite_user_repo
         self.video_repo = video_repo
@@ -199,7 +200,7 @@ class TikTokCrawler:
         self.sadcaptcha_api_key = "fd31d51515ed18cadec7d4a522894997"
         self.login_restart_attempted = False        # ← 追加
         self.engagement_type = engagement_type
-
+        self.device_type = device_type
     def __enter__(self):
         # クローラーアカウントを取得
         if self.crawler_account_id is not None:
@@ -219,7 +220,7 @@ class TikTokCrawler:
                 raise Exception("利用可能なクローラーアカウントがありません")
         
         # Seleniumの設定
-        self.selenium_manager = SeleniumManager(self.crawler_account.proxy, self.sadcaptcha_api_key)
+        self.selenium_manager = SeleniumManager(self.crawler_account.proxy, self.sadcaptcha_api_key, self.device_type)
         self.driver = self.selenium_manager.setup_driver()
         self.wait = WebDriverWait(self.driver, 15)  # タイムアウトを15秒に変更
 
@@ -258,7 +259,8 @@ class TikTokCrawler:
     def _login(self):
         logger.info(f"クロール用アカウント{self.crawler_account.username}でTikTokにログイン中...")
         self.driver.get(f"{self.BASE_URL}/login/phone-or-email/email")
-        self.driver.execute_script("document.body.style.width=''")   # ← 画面中央寄せ処理を追加
+        
+        
         self._random_sleep(2.0, 4.0)
 
         # ログインフォームの要素を待機
@@ -1500,7 +1502,12 @@ def main():
         default="like",
         help="クロール対象のデータの種類 (デフォルト: like)"
     )
-
+    parser.add_argument(
+        "--device-type",
+        choices=["pc", "vps"],
+        default="pc",
+        help="デバイスタイプ (デフォルト: pc)"
+    )
     args = parser.parse_args()
 
     # データベース接続の初期化
@@ -1517,7 +1524,8 @@ def main():
             video_repo=video_repo,
             crawler_account_id=args.crawler_account_id,
             sadcaptcha_api_key=os.getenv("SADCAPTCHA_API_KEY"),  # APIキーを設定
-            engagement_type=args.engagement_type
+            engagement_type=args.engagement_type,
+            device_type=args.device_type
         ) as crawler:
             crawler.crawl_favorite_users(
                 light_or_heavy=args.mode,
