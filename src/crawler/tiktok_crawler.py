@@ -752,6 +752,19 @@ class TikTokCrawler:
                     post_time_text = self.driver.find_element(By.CSS_SELECTOR, "[data-e2e='browser-nickname'] span:last-child").text
                 except NoSuchElementException:
                     post_time_text = ""
+        
+        # 音楽情報の取得（複数のセレクターに対応）
+        try:
+            # まず新しい形式を試す
+            audio_element = self.driver.find_element(By.CSS_SELECTOR, "[data-e2e='video-music']")
+            audio_info_text = audio_element.get_attribute("aria-label").replace("Watch more videos with music ", "")
+        except (NoSuchElementException, AttributeError):
+            try:
+                # 次に古い形式を試す
+                audio_info_text = self.driver.find_element(By.CSS_SELECTOR, "[data-e2e='browse-music'] .css-pvx3oa-DivMusicText, [data-e2e='browse-music-title']").text
+            except NoSuchElementException:
+                audio_info_text = ""
+
         like_count_text = self.driver.find_element(By.CSS_SELECTOR, "strong[data-e2e='like-count']").text
         comment_count_text = self.driver.find_element(By.CSS_SELECTOR, "strong[data-e2e='comment-count']").text
         collect_count_text = self.driver.find_element(By.CSS_SELECTOR, "strong[data-e2e='undefined-count']").text
@@ -762,7 +775,7 @@ class TikTokCrawler:
             "video_url": video_url,
             "video_title": video_title,
             "post_time_text": post_time_text,
-            "audio_info_text": audio_info_text,
+            "audio_info_text": audio_info_text,  # ← これが不足していました
             "like_count_text": like_count_text,
             "comment_count_text": comment_count_text,
             "collect_count_text": collect_count_text,
