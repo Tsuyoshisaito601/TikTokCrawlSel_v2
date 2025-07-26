@@ -724,8 +724,34 @@ class TikTokCrawler:
     
         video_url = self.driver.current_url
         video_title = self.driver.find_element(By.CSS_SELECTOR, "[data-e2e='browse-video-desc']").text
-        post_time_text = self.driver.find_element(By.CSS_SELECTOR, "[data-e2e='browser-nickname'] span:last-child").text
-        audio_info_text = self.driver.find_element(By.CSS_SELECTOR, "[data-e2e='browse-music'] .css-pvx3oa-DivMusicText").text
+        
+        # より堅牢な投稿時間要素の取得（direct_access版）
+        try:
+            # 新しい形式: StyledLinkクラスのaタグ
+            post_time_element = self.driver.find_element(By.CSS_SELECTOR, "a[class*='StyledLink']")
+            full_text = post_time_element.text
+            # 投稿日時部分を抽出（" · "で区切る）
+            if " · " in full_text:
+                post_time_text = full_text.split(" · ")[-1]
+            elif "·" in full_text:
+                post_time_text = full_text.split("·")[-1].strip()
+            else:
+                post_time_text = full_text
+        except NoSuchElementException:
+            try:
+                # 投稿情報部分を直接取得
+                post_time_element = self.driver.find_element(By.CSS_SELECTOR, "span[class*='SpanOtherInfos']")
+                full_text = post_time_element.text
+                if " · " in full_text:
+                    post_time_text = full_text.split(" · ")[-1]
+                else:
+                    post_time_text = full_text
+            except NoSuchElementException:
+                try:
+                    # 古い形式をフォールバック
+                    post_time_text = self.driver.find_element(By.CSS_SELECTOR, "[data-e2e='browser-nickname'] span:last-child").text
+                except NoSuchElementException:
+                    post_time_text = ""
         like_count_text = self.driver.find_element(By.CSS_SELECTOR, "strong[data-e2e='like-count']").text
         comment_count_text = self.driver.find_element(By.CSS_SELECTOR, "strong[data-e2e='comment-count']").text
         collect_count_text = self.driver.find_element(By.CSS_SELECTOR, "strong[data-e2e='undefined-count']").text
