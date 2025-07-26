@@ -656,7 +656,24 @@ class TikTokCrawler:
     
         video_url = self.driver.current_url
         video_title = self.driver.find_element(By.CSS_SELECTOR, "[data-e2e='browse-video-desc'],[data-e2e='video-desc']").text
-        post_time_element = self.driver.find_element(By.CSS_SELECTOR, "a[class*='StyledAuthorAnchor'], [data-e2e='browser-nickname'] span:last-child")
+        # より堅牢な投稿時間要素の取得
+        try:
+            # 新しい形式: StyledLinkクラスのaタグ
+            post_time_element = self.driver.find_element(By.CSS_SELECTOR, "a[class*='StyledLink']")
+            full_text = post_time_element.text
+        except NoSuchElementException:
+            try:
+                # 投稿情報部分を直接取得
+                post_time_element = self.driver.find_element(By.CSS_SELECTOR, "span[class*='SpanOtherInfos']")
+                full_text = post_time_element.text
+            except NoSuchElementException:
+                try:
+                    # 古い形式をフォールバック
+                    post_time_element = self.driver.find_element(By.CSS_SELECTOR, "a[class*='StyledAuthorAnchor'], [data-e2e='browser-nickname'] span:last-child")
+                    full_text = post_time_element.text
+                except NoSuchElementException:
+                    post_time_text = ""
+                    full_text = ""
         # audio_url = self.driver.find_element(By.CSS_SELECTOR, "[data-e2e='browse-music'] a,[data-e2e='video-music']").get_attribute("href")
         try:
             # まず新しい形式を試す
