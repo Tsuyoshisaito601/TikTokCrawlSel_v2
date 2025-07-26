@@ -293,7 +293,11 @@ class TikTokCrawler:
         try:
             login_wait = WebDriverWait(self.driver, 60)  # 絵合わせ認証が出てきたら人力で解いてね
             login_wait.until(
-                EC.presence_of_element_located((By.CSS_SELECTOR, "[data-e2e='profile-icon']")),
+                EC.any_of(
+                    EC.presence_of_element_located((By.CSS_SELECTOR, "[data-e2e='profile-icon']")),
+                    EC.presence_of_element_located((By.CSS_SELECTOR, "button[aria-label='プロフィール']")),
+                    EC.presence_of_element_located((By.CSS_SELECTOR, ".TUXButton[aria-label='プロフィール']"))
+                )
             )
             logger.info(f"クロール用アカウント{self.crawler_account.username}でTikTokへのログインに成功しました")
         except TimeoutException:
