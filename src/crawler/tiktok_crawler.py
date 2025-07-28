@@ -658,22 +658,21 @@ class TikTokCrawler:
         video_title = self.driver.find_element(By.CSS_SELECTOR, "[data-e2e='browse-video-desc'],[data-e2e='video-desc']").text
         # より堅牢な投稿時間要素の取得
         try:
-            # 新しい形式: StyledLinkクラスのaタグ
-            post_time_element = self.driver.find_element(By.CSS_SELECTOR, "a[class*='StyledLink']")
-            full_text = post_time_element.text
+            # 最も確実：投稿情報部分の最後のspan
+            post_time_element = self.driver.find_element(By.CSS_SELECTOR, "span[class*='SpanOtherInfos'] span:last-child")
+            post_time_text = post_time_element.text
         except NoSuchElementException:
             try:
-                # 投稿情報部分を直接取得
-                post_time_element = self.driver.find_element(By.CSS_SELECTOR, "span[class*='SpanOtherInfos']")
-                full_text = post_time_element.text
+                # フォールバック：ユーザーリンク限定
+                post_time_element = self.driver.find_element(By.CSS_SELECTOR, "a[href^='/@'][class*='StyledLink'] span:last-child")
+                post_time_text = post_time_element.text
             except NoSuchElementException:
                 try:
-                    # 古い形式をフォールバック
-                    post_time_element = self.driver.find_element(By.CSS_SELECTOR, "a[class*='StyledAuthorAnchor'], [data-e2e='browser-nickname'] span:last-child")
-                    full_text = post_time_element.text
+                    # 古い形式
+                    post_time_element = self.driver.find_element(By.CSS_SELECTOR, "[data-e2e='browser-nickname'] span:last-child")
+                    post_time_text = post_time_element.text
                 except NoSuchElementException:
                     post_time_text = ""
-                    full_text = ""
         # audio_url = self.driver.find_element(By.CSS_SELECTOR, "[data-e2e='browse-music'] a,[data-e2e='video-music']").get_attribute("href")
         try:
             # まず新しい形式を試す
@@ -727,29 +726,19 @@ class TikTokCrawler:
         
         # より堅牢な投稿時間要素の取得（direct_access版）
         try:
-            # 新しい形式: StyledLinkクラスのaタグ
-            post_time_element = self.driver.find_element(By.CSS_SELECTOR, "a[class*='StyledLink']")
-            full_text = post_time_element.text
-            # 投稿日時部分を抽出（" · "で区切る）
-            if " · " in full_text:
-                post_time_text = full_text.split(" · ")[-1]
-            elif "·" in full_text:
-                post_time_text = full_text.split("·")[-1].strip()
-            else:
-                post_time_text = full_text
+            # 最も確実：投稿情報部分の最後のspan
+            post_time_element = self.driver.find_element(By.CSS_SELECTOR, "span[class*='SpanOtherInfos'] span:last-child")
+            post_time_text = post_time_element.text
         except NoSuchElementException:
             try:
-                # 投稿情報部分を直接取得
-                post_time_element = self.driver.find_element(By.CSS_SELECTOR, "span[class*='SpanOtherInfos']")
-                full_text = post_time_element.text
-                if " · " in full_text:
-                    post_time_text = full_text.split(" · ")[-1]
-                else:
-                    post_time_text = full_text
+                # フォールバック：ユーザーリンク限定
+                post_time_element = self.driver.find_element(By.CSS_SELECTOR, "a[href^='/@'][class*='StyledLink'] span:last-child")
+                post_time_text = post_time_element.text
             except NoSuchElementException:
                 try:
-                    # 古い形式をフォールバック
-                    post_time_text = self.driver.find_element(By.CSS_SELECTOR, "[data-e2e='browser-nickname'] span:last-child").text
+                    # 古い形式
+                    post_time_element = self.driver.find_element(By.CSS_SELECTOR, "[data-e2e='browser-nickname'] span:last-child")
+                    post_time_text = post_time_element.text
                 except NoSuchElementException:
                     post_time_text = ""
         

@@ -1,0 +1,6 @@
+2025-07-28 20:35:12,382 - src.crawler.selenium_manager - INFO - CAPTCHA Solver付きのドライバーを作成します
+2025-07-28 20:35:13,177 - src.crawler.selenium_manager - INFO - Chromeドライバーの設定が完了しました
+2025-07-28 20:35:31,664 - src.crawler.selenium_manager - DEBUG - captcha_present=True
+2025-07-28 20:35:31,667 - src.crawler.selenium_manager - INFO - [1/10] CAPTCHA 解決を試行中…
+2025-07-28 20:36:19,001 - src.crawler.selenium_manager - ERROR - CAPTCHA 解決中に例外が発生: Neither puzzle, shapes, or rotate captcha was present.
+2025-07-28 20:47:11,891 - src.crawler.selenium_manager - INFO - Chromeドライバーを終了しました
