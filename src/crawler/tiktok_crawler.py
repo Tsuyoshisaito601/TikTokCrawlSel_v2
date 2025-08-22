@@ -1518,8 +1518,8 @@ def main():
     # 必須の引数
     parser.add_argument(
         "mode",
-        choices=["light", "heavy", "both"],
-        help="クロールモード。light: 軽いデータのみ、heavy: 重いデータのみ、both: 両方"
+        choices=["light", "heavy", "both", "test"],
+        help="クロールモード。light: 軽いデータのみ、heavy: 重いデータのみ、both: 両方、test: ログインのみ"
     )
     
     # オプションの引数
@@ -1567,22 +1567,45 @@ def main():
         video_repo = VideoRepository(db)
             
         # クローラーの初期化と実行
-        with TikTokCrawler(
-            crawler_account_repo=crawler_account_repo,
-            favorite_user_repo=favorite_user_repo,
-            video_repo=video_repo,
-            crawler_account_id=args.crawler_account_id,
-            sadcaptcha_api_key=os.getenv("SADCAPTCHA_API_KEY"),  # APIキーを設定
-            engagement_type=args.engagement_type,
-            device_type=args.device_type
-        ) as crawler:
-            crawler.crawl_favorite_users(
-                light_or_heavy=args.mode,
-                max_videos_per_user=args.max_videos_per_user,
-                max_users=args.max_users,
-                recrawl=args.recrawl,
-                engagement_type=args.engagement_type
+        if args.mode == "test":
+            # testモード: ログインのみ実施し、以降は停止（ブラウザは開いたまま）
+            crawler = TikTokCrawler(
+                crawler_account_repo=crawler_account_repo,
+                favorite_user_repo=favorite_user_repo,
+                video_repo=video_repo,
+                crawler_account_id=args.crawler_account_id,
+                sadcaptcha_api_key=os.getenv("SADCAPTCHA_API_KEY"),
+                engagement_type=args.engagement_type,
+                device_type=args.device_type
             )
+            try:
+                crawler.__enter__()  # ログインまで実施
+                logger.info("testモード: ログインのみ実行。ブラウザは開いたままです。Enterで終了します。")
+                input()
+            except KeyboardInterrupt:
+                raise
+            finally:
+                try:
+                    crawler.__exit__(None, None, None)
+                except Exception:
+                    logger.exception("ブラウザ終了時にエラーが発生しました")
+        else:
+            with TikTokCrawler(
+                crawler_account_repo=crawler_account_repo,
+                favorite_user_repo=favorite_user_repo,
+                video_repo=video_repo,
+                crawler_account_id=args.crawler_account_id,
+                sadcaptcha_api_key=os.getenv("SADCAPTCHA_API_KEY"),  # APIキーを設定
+                engagement_type=args.engagement_type,
+                device_type=args.device_type
+            ) as crawler:
+                crawler.crawl_favorite_users(
+                    light_or_heavy=args.mode,
+                    max_videos_per_user=args.max_videos_per_user,
+                    max_users=args.max_users,
+                    recrawl=args.recrawl,
+                    engagement_type=args.engagement_type
+                )
 
 if __name__ == "__main__":
     import sys
