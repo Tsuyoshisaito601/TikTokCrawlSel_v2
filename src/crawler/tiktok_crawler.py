@@ -501,7 +501,7 @@ class TikTokCrawler:
     def get_video_play_count_datas_from_user_page(self, max_videos: int = 100) -> List[Dict[str, str]]:
         logger.debug(f"動画の再生数の軽いデータの前半を取得中...")
         video_stats = []
-        self._random_sleep(15.0, 20.0)
+        self._random_sleep(10.0, 20.0)
         
         self.scroll_user_page(max_videos)
         video_elements = self.driver.find_elements(By.CSS_SELECTOR, "[data-e2e='user-post-item']")
@@ -1498,16 +1498,54 @@ class TikTokCrawler:
             self.navigate_to_user_page(user.favorite_user_username)
         except self.TikTokUserNotFoundException:
             logger.info(f"ユーザー @{user.favorite_user_username} は存在しないので、このユーザーに対するクロールを中断します")
-            return False # ユーザー単位でしか問題にならないエラーなのでここで処置完了としてよい
+            return False
         except Exception:
             raise
-        
+
+        # 追加: フォロワー数を先に取得してログ＆DB保存
+        followers_count_text, followers_count = self.get_user_followers_count_from_user_page()
+        logger.info(f"@{user.favorite_user_username} フォロワー数: {followers_count_text} ({followers_count})")
+
+        # ここを当日→前日に変更
+        collection_date = (datetime.now() - timedelta(days=1)).date()
+
+        if followers_count_text is not None or followers_count is not None:
+            try:
+                self.favorite_user_repo.upsert_account_follower_history(
+                    account_id=user.id,
+                    collection_date=collection_date,  # ここも差し替え
+                    follower_text=followers_count_text,
+                    follower_count=followers_count
+                )
+                logger.info(f"フォロワー数を保存しました: account_id={user.id}, date={collection_date}")
+            except Exception:
+                logger.exception("フォロワー数の保存に失敗しました")
+        else:
+            logger.warning("フォロワー数が取得できなかったため保存をスキップします")
+
         light_play_datas = self.get_video_play_count_datas_from_user_page(max_videos_per_user)
 
         logger.info(f"ユーザー @{user.favorite_user_username} の再生数の取得が完了")
 
         self.parse_and_save_play_count_datas(light_play_datas)
         logger.info(f"ユーザー @{user.favorite_user_username} の再生数のクロールを完了しました。")
+
+    def get_user_followers_count_from_user_page(self) -> Tuple[Optional[str], Optional[int]]:
+        logger.debug("プロフィールのフォロワー数を取得中...")
+        try:
+            self._random_sleep(1.0, 2.0)
+            elem = self.wait.until(
+                EC.presence_of_element_located((By.CSS_SELECTOR, "[data-e2e='followers-count']"))
+            )
+            text = elem.text.strip()
+            count = parse_tiktok_number(text)
+            logger.debug(f"フォロワー数取得成功: {text} -> {count}")
+            return text, count
+        except TimeoutException:
+            logger.warning("フォロワー数要素の待機でタイムアウトしました", exc_info=True)
+        except NoSuchElementException:
+            logger.warning("フォロワー数要素が見つかりませんでした", exc_info=True)
+        return None, None
 
 
 def main():

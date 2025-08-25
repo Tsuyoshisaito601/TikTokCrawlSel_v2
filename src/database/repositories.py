@@ -1,5 +1,5 @@
 from datetime import datetime
-from typing import List, Optional, Set, Dict
+from typing import List, Optional, Set, Dict, Tuple
 from .database import Database
 from .models import CrawlerAccount, FavoriteUser, VideoHeavyRawData, VideoLightRawData, VideoPlayCountRawData
 from ..logger import setup_logger
@@ -239,6 +239,22 @@ class FavoriteUserRepository:
             WHERE favorite_user_username = %s
         """
         self.db.execute_query(query, (is_new_account, username))
+
+    def upsert_account_follower_history(self, account_id, collection_date, follower_text, follower_count):
+        """
+        account_follower_history へ当日分をUPSERT
+        """
+        query = """
+            INSERT INTO account_follower_history (
+                account_id, collection_date, follower_text, follower_count
+            ) VALUES (
+                %s, %s, %s, %s
+            )
+            ON DUPLICATE KEY UPDATE
+                follower_text = VALUES(follower_text),
+                follower_count = VALUES(follower_count)
+        """
+        self.db.execute_query(query, (account_id, collection_date, follower_text, follower_count))
 
 
 class VideoRepository:
