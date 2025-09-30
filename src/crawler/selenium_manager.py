@@ -11,29 +11,44 @@ from selenium.common.exceptions import (
     ElementClickInterceptedException,
 )
 from concurrent.futures import ThreadPoolExecutor
+from typing import Optional
 from ..logger import setup_logger
 import tempfile, shutil, os, time, logging
 
 logger = setup_logger(__name__)
 
 class SeleniumManager:
-    def __init__(self, proxy: str = None, sadcaptcha_api_key: str = None, device_type: str = "pc"):
+    def __init__(self, proxy: str = None, sadcaptcha_api_key: str = None, device_type: str = "pc", use_profile: bool = False, user_data_dir: Optional[str] = None, profile_directory: Optional[str] = None):
         self.driver = None
-        self.solver = None  
+        self.solver = None
         self.proxy = proxy
         self.sadcaptcha_api_key = sadcaptcha_api_key
         self.device_type = device_type
+        self.use_profile = use_profile
+        self.user_data_dir = user_data_dir
+        self.profile_directory = profile_directory
+        self._temp_profile_dir: Optional[str] = None
 
     def setup_driver(self):
         try:
-            profile_dir = tempfile.mkdtemp(prefix="sel_profile_")
-            # 共通のオプション設定
+            device_str = "モバイル用" if self.device_type == "mobile" else ""
+            if self.use_profile:
+                if not self.user_data_dir:
+                    raise ValueError("user_data_dir must be provided when use_profile is True")
+                profile_dir = self.user_data_dir
+                self._temp_profile_dir = None
+            else:
+                profile_dir = tempfile.mkdtemp(prefix="sel_profile_")
+                self._temp_profile_dir = profile_dir
+            # 既存のオプション設定
             options = uc.ChromeOptions()
             if self.proxy:
                 options.add_argument(f'--proxy-server={self.proxy}')
             
-            # その他の設定
+            # 基本設定
             options.add_argument(f"--user-data-dir={profile_dir}")
+            if self.use_profile and self.profile_directory:
+                options.add_argument(f"--profile-directory={self.profile_directory}")
             options.add_argument('--no-sandbox')
             options.add_argument('--mute-audio')
             options.add_argument('--use-angle=gl')
@@ -215,3 +230,6 @@ class SeleniumManager:
         if self.driver:
             self.driver.quit()
             logger.info("Chromeドライバーを終了しました")
+        if self._temp_profile_dir and os.path.isdir(self._temp_profile_dir):
+            shutil.rmtree(self._temp_profile_dir, ignore_errors=True)
+            self._temp_profile_dir = None
