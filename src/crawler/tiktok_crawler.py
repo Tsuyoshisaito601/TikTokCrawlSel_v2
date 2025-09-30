@@ -188,7 +188,10 @@ class TikTokCrawler:
                  crawler_account_id: Optional[int] = None,
                  sadcaptcha_api_key: Optional[str] = None,
                  engagement_type: str = "like",
-                 device_type: str = "pc"):
+                 device_type: str = "pc",
+                 use_profile: bool = False,
+                 chrome_user_data_dir: Optional[str] = None,
+                 chrome_profile_directory: Optional[str] = None):
         self.crawler_account_repo = crawler_account_repo
         self.favorite_user_repo = favorite_user_repo
         self.video_repo = video_repo
@@ -201,6 +204,9 @@ class TikTokCrawler:
         self.login_restart_attempted = False        # ← 追加
         self.engagement_type = engagement_type
         self.device_type = device_type
+        self.use_profile = use_profile
+        self.chrome_user_data_dir = chrome_user_data_dir
+        self.chrome_profile_directory = chrome_profile_directory
     def __enter__(self):
         # クローラーアカウントを取得
         if self.crawler_account_id is not None:
@@ -220,7 +226,14 @@ class TikTokCrawler:
                 raise Exception("利用可能なクローラーアカウントがありません")
         
         # Seleniumの設定
-        self.selenium_manager = SeleniumManager(self.crawler_account.proxy, self.sadcaptcha_api_key, self.device_type)
+        self.selenium_manager = SeleniumManager(
+            self.crawler_account.proxy,
+            self.sadcaptcha_api_key,
+            self.device_type,
+            use_profile=self.use_profile,
+            user_data_dir=self.chrome_user_data_dir,
+            profile_directory=self.chrome_profile_directory,
+        )
         self.driver = self.selenium_manager.setup_driver()
         self.wait = WebDriverWait(self.driver, 15)  # タイムアウトを15秒に変更
 
@@ -1595,7 +1608,31 @@ def main():
         default="pc",
         help="デバイスタイプ (デフォルト: pc)"
     )
+    parser.add_argument(
+        "--use-profile",
+        action="store_true",
+        help="Use a pre-configured Chrome profile that already has required extensions"
+    )
+    parser.add_argument(
+        "--chrome-user-data-dir",
+        help="Chrome user data directory to reuse when --use-profile is specified"
+    )
+    parser.add_argument(
+        "--chrome-profile-directory",
+        help="Chrome profile directory name (e.g. Default, Profile 1) used with --use-profile"
+    )
     args = parser.parse_args()
+
+    if not args.use_profile and (args.chrome_user_data_dir or args.chrome_profile_directory):
+        parser.error("--chrome-user-data-dir/--chrome-profile-directory require --use-profile")
+    if args.use_profile:
+        if not args.chrome_user_data_dir:
+            parser.error("--chrome-user-data-dir is required when --use-profile is set")
+        if not args.chrome_profile_directory:
+            args.chrome_profile_directory = "Default"
+    else:
+        args.chrome_user_data_dir = None
+        args.chrome_profile_directory = None
 
     # データベース接続の初期化
     with Database() as db:
@@ -1614,7 +1651,10 @@ def main():
                 crawler_account_id=args.crawler_account_id,
                 sadcaptcha_api_key=os.getenv("SADCAPTCHA_API_KEY"),
                 engagement_type=args.engagement_type,
-                device_type=args.device_type
+                device_type=args.device_type,
+                use_profile=args.use_profile,
+                chrome_user_data_dir=args.chrome_user_data_dir,
+                chrome_profile_directory=args.chrome_profile_directory
             )
             try:
                 crawler.__enter__()  # ログインまで実施
@@ -1635,7 +1675,10 @@ def main():
                 crawler_account_id=args.crawler_account_id,
                 sadcaptcha_api_key=os.getenv("SADCAPTCHA_API_KEY"),  # APIキーを設定
                 engagement_type=args.engagement_type,
-                device_type=args.device_type
+                device_type=args.device_type,
+                use_profile=args.use_profile,
+                chrome_user_data_dir=args.chrome_user_data_dir,
+                chrome_profile_directory=args.chrome_profile_directory
             ) as crawler:
                 crawler.crawl_favorite_users(
                     light_or_heavy=args.mode,
