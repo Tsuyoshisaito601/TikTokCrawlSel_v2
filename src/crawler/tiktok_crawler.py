@@ -271,9 +271,24 @@ class TikTokCrawler:
     # クロール用アカウントself.crawler_accountでTikTokにログインする
     def _login(self):
         logger.info(f"クロール用アカウント{self.crawler_account.username}でTikTokにログイン中...")
+        if self.use_profile:
+            logger.info("既存プロファイルを利用してトップページへ遷移します")
+            self.driver.get(self.BASE_URL)
+            self._random_sleep(2.0, 4.0)
+            try:
+                WebDriverWait(self.driver, 15).until(
+                    EC.any_of(
+                        EC.presence_of_element_located((By.CSS_SELECTOR, "[data-e2e='profile-icon']")),
+                        EC.presence_of_element_located((By.CSS_SELECTOR, "button[aria-label='プロフィール']")),
+                        EC.presence_of_element_located((By.CSS_SELECTOR, ".TUXButton[aria-label='プロフィール']"))
+                    )
+                )
+                logger.info(f"クロール用アカウント{self.crawler_account.username}でTikTokへのログインに成功しました")
+                return
+            except TimeoutException:
+                logger.warning("既存プロファイルでログイン状態を確認できませんでした。ログイン画面から再ログインします。")
+                self._random_sleep(1.0, 2.0)
         self.driver.get(f"{self.BASE_URL}/login/phone-or-email/email")
-        
-        
         self._random_sleep(2.0, 4.0)
 
         # ログインフォームの要素を待機
