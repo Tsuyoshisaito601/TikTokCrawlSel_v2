@@ -1,0 +1,18 @@
+{
+  "project_id": "tiktok-analytics-prod-451609",
+  "credentials_path": "C:\\keys\\gcp-sa.json",
+  "subscriptions": [
+    {
+      "subscription_name": "pc-01-s1",
+      "working_dir": "C:\\Users\\Administrator\\TikTokCrawlSel_v2",
+      "python_path": "C:\\Users\\Administrator\\TikTokCrawlSel_v2\\.venv\\Scripts\\python.exe",
+      "extra_args": []
+    },
+    {
+      "subscription_name": "pc-01-s2",
+      "working_dir": "C:\\Users\\Administrator\\TikTokCrawlSel_v2",
+      "python_path": "C:\\Users\\Administrator\\TikTokCrawlSel_v2\\.venv\\Scripts\\python.exe",
+      "extra_args": []
+    }
+  ]
+}
