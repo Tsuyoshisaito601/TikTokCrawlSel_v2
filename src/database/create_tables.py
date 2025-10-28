@@ -76,6 +76,7 @@ COLLATE = utf8mb4_0900_ai_ci;
         collect_count INT,
         share_count_text VARCHAR(255),
         share_count INT,
+        comments_json LONGTEXT,
         crawled_at DATETIME NOT NULL,
         crawling_algorithm VARCHAR(50) NOT NULL,
         created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,

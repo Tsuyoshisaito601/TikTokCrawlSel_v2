@@ -1,0 +1,5 @@
+2025-10-28 22:09:07,004 - src.crawler.selenium_manager - INFO - CAPTCHA Solver付きのドライバーを作成します
+2025-10-28 22:09:07,585 - src.crawler.selenium_manager - INFO - Chromeドライバーの設定が完了しました
+2025-10-28 22:09:31,331 - src.crawler.selenium_manager - DEBUG - captcha_present=True
+2025-10-28 22:09:31,332 - src.crawler.selenium_manager - INFO - [1/10] CAPTCHA 解決を試行中…
+2025-10-28 22:09:44,222 - src.crawler.selenium_manager - ERROR - CAPTCHA解決中にエラーが発生しました: 

@@ -1,0 +1,2 @@
+2025-10-28 22:08:59,380 - src.database.database - INFO - データベースに接続しました
+2025-10-28 22:10:05,117 - src.database.database - INFO - データベース接続を閉じました

@@ -9,6 +9,8 @@ from datetime import datetime, timedelta
 import random
 import time
 from typing import Optional, List, Dict, Tuple
+import time
+import json
 import json
 import os
 from ..database.models import CrawlerAccount, FavoriteUser, VideoHeavyRawData, VideoLightRawData, VideoPlayCountRawData
@@ -736,6 +738,13 @@ class TikTokCrawler:
             post_time_text = full_text
         logger.debug(f"動画の重いデータを取得しました: {video_url}")
 
+        # コメント取得（上位N件）
+        comments = self.get_video_comments_from_video_page(max_comments=30)
+        if comments:
+            logger.info(f"コメントを{len(comments)}件取得: {video_url}")
+        else:
+            logger.info(f"コメントは0件でした: {video_url}")
+
         return {
             "video_url": video_url,
             "video_title": video_title,
@@ -744,6 +753,7 @@ class TikTokCrawler:
             "like_count_text": like_count_text,
             "comment_count_text": comment_count_text,
             "collect_count_text": collect_count_text,
+            "comments_json": json.dumps(comments, ensure_ascii=False),
             "crawling_algorithm": "selenium-human-like-1"
         }
     def get_video_heavy_data_from_direct_access(self) -> Dict[str, str]:
@@ -788,6 +798,13 @@ class TikTokCrawler:
         
         logger.debug(f"動画の重いデータを取得しました: {video_url}")
 
+        # コメント取得（上位N件）
+        comments = self.get_video_comments_from_video_page(max_comments=30)
+        if comments:
+            logger.info(f"コメントを{len(comments)}件取得: {video_url}")
+        else:
+            logger.info(f"コメントは0件でした: {video_url}")
+
         return {
             "video_url": video_url,
             "video_title": video_title,
@@ -796,8 +813,56 @@ class TikTokCrawler:
             "like_count_text": like_count_text,
             "comment_count_text": comment_count_text,
             "collect_count_text": collect_count_text,
+            "comments_json": json.dumps(comments, ensure_ascii=False),
             "crawling_algorithm": "selenium-human-like-1"
         }
+
+    def get_video_comments_from_video_page(self, max_comments: int = 30) -> List[str]:
+        comments: List[str] = []
+        try:
+            # コメントが未表示なら開く（存在すれば）
+            try:
+                self.driver.find_element(By.CSS_SELECTOR, "p[data-e2e='comment-level-1']")
+            except NoSuchElementException:
+                try:
+                    btn = self.driver.find_element(
+                        By.CSS_SELECTOR, "[data-e2e='browse-comment-icon'],[data-e2e='comment-icon']"
+                    )
+                    self.driver.execute_script("arguments[0].click();", btn)
+                    self._random_sleep(0.8, 1.6)
+                except NoSuchElementException:
+                    pass
+
+            deadline = time.time() + 10
+            last_seen = 0
+            while time.time() < deadline and len(comments) < max_comments:
+                elems = self.driver.find_elements(By.CSS_SELECTOR, "p[data-e2e='comment-level-1']")
+                if elems:
+                    self.driver.execute_script("arguments[0].scrollIntoView({block:'end'});", elems[-1])
+                self._random_sleep(0.6, 1.2)
+
+                elems = self.driver.find_elements(By.CSS_SELECTOR, "p[data-e2e='comment-level-1']")
+                for e in elems[last_seen:]:
+                    try:
+                        text = e.find_element(By.CSS_SELECTOR, "span[dir]").text.strip()
+                        if text:
+                            comments.append(text)
+                            if len(comments) >= max_comments:
+                                break
+                    except NoSuchElementException:
+                        continue
+                last_seen = len(elems)
+        except Exception:
+            logger.warning("コメント取得に失敗しました", exc_info=True)
+
+        # 重複除去（順序維持）
+        seen = set()
+        uniq: List[str] = []
+        for c in comments:
+            if c not in seen:
+                uniq.append(c)
+                seen.add(c)
+        return uniq[:max_comments]
 
     # 動画ページからユーザーページに移動する
     # Condition: もともとユーザーページからのクリックで動画ページが開かれていること
@@ -1082,6 +1147,7 @@ class TikTokCrawler:
             collect_count=parse_tiktok_number(heavy_data.get("collect_count_text")),
             share_count_text=None,  # ここでは取得できない
             share_count=None,  # ここでは取得できない
+            comments_json=heavy_data.get("comments_json"),
             crawled_at=datetime.now(),
             crawling_algorithm=heavy_data["crawling_algorithm"]
         )

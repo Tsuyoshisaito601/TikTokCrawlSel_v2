@@ -1,0 +1,9 @@
+2025-10-28 22:10:22,616 - src.crawler.selenium_manager - INFO - CAPTCHA Solver付きのドライバーを作成します
+2025-10-28 22:10:22,792 - src.crawler.selenium_manager - INFO - Chromeドライバーの設定が完了しました
+2025-10-28 22:10:44,880 - src.crawler.selenium_manager - DEBUG - captcha_present=True
+2025-10-28 22:10:44,880 - src.crawler.selenium_manager - INFO - [1/10] CAPTCHA 解決を試行中…
+2025-10-28 22:10:54,699 - src.crawler.selenium_manager - DEBUG - solve_CaptchaType.ROTATE_V2() => None
+2025-10-28 22:10:54,731 - src.crawler.selenium_manager - INFO - CAPTCHA まだ残存。3s 待って再試行
+2025-10-28 22:10:57,743 - src.crawler.selenium_manager - INFO - [2/10] CAPTCHA 解決を試行中…
+2025-10-28 22:11:34,699 - src.crawler.selenium_manager - ERROR - CAPTCHA 解決中に例外が発生: Neither puzzle, shapes, or rotate captcha was present.
+2025-10-28 22:12:47,969 - src.crawler.selenium_manager - INFO - Chromeドライバーを終了しました
