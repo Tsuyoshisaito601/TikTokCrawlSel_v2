@@ -1,0 +1,28 @@
+2025-10-28 22:10:22,794 - __main__ - INFO - クロール用アカウントnana_ito@pivotx.jpでTikTokにログイン中...
+2025-10-28 22:11:34,711 - __main__ - INFO - クロール用アカウントnana_ito@pivotx.jpでTikTokへのログインに成功しました
+2025-10-28 22:11:34,739 - __main__ - INFO - クロール対象のお気に入りユーザー200件に対しheavyデータのクロールを行います
+2025-10-28 22:11:34,775 - __main__ - INFO - ユーザー @yurileeeee のheavyデータのクロールを開始
+2025-10-28 22:11:34,776 - __main__ - DEBUG - ユーザー @yurileeeee のページに移動中...
+2025-10-28 22:11:45,630 - __main__ - DEBUG - ユーザー @yurileeeee のページに移動しました
+2025-10-28 22:11:45,631 - __main__ - DEBUG - 動画の軽いデータの前半を取得中...
+2025-10-28 22:12:16,465 - __main__ - DEBUG - 100件の画像要素を目標にユーザーページをスクロールします...
+2025-10-28 22:12:17,832 - __main__ - DEBUG - 38件の画像要素を確認しました。
+2025-10-28 22:12:22,542 - __main__ - DEBUG - 69件の画像要素を確認しました。
+2025-10-28 22:12:28,132 - __main__ - DEBUG - 85件の画像要素を確認しました。
+2025-10-28 22:12:32,854 - __main__ - DEBUG - 101件の画像要素を確認しました。
+2025-10-28 22:12:32,855 - __main__ - DEBUG - 目標以上の101件の画像要素を確認しました。スクロールを完了します。
+2025-10-28 22:12:32,872 - __main__ - DEBUG - 動画の軽いデータの前半を求めて100本の動画要素を走査します
+2025-10-28 22:12:38,391 - __main__ - DEBUG - 動画の軽いデータの前半を取得しました: 100件
+2025-10-28 22:12:38,392 - __main__ - INFO - ユーザー @yurileeeee の重いデータのクロールを開始
+2025-10-28 22:12:38,401 - __main__ - ERROR - ユーザー @yurileeeee のheavyデータのクロール中に失敗。スキップします
+Traceback (most recent call last):
+  File "D:\app_ssd\Buzzmiru\Crawlsel2\TikTokCrawlSel_v2\src\crawler\tiktok_crawler.py", line 1580, in crawl_favorite_users
+    self.crawl_user(user, light_or_heavy=light_or_heavy, max_videos_per_user=max_videos_per_user, recrawl=recrawl)
+  File "D:\app_ssd\Buzzmiru\Crawlsel2\TikTokCrawlSel_v2\src\crawler\tiktok_crawler.py", line 1348, in crawl_user
+    for play_data in light_play_datas:
+UnboundLocalError: local variable 'light_play_datas' referenced before assignment
+2025-10-28 22:12:38,403 - __main__ - INFO - ユーザー @kazugurashi のheavyデータのクロールを開始
+2025-10-28 22:12:38,406 - __main__ - DEBUG - ユーザー @kazugurashi のページに移動中...
+2025-10-28 22:12:43,975 - __main__ - DEBUG - ユーザー @kazugurashi のページに移動しました
+2025-10-28 22:12:43,978 - __main__ - DEBUG - 動画の軽いデータの前半を取得中...
+2025-10-28 22:12:48,377 - __main__ - INFO - ユーザーにより中断されました

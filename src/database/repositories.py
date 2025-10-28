@@ -270,10 +270,10 @@ class VideoRepository:
                 audio_info_text, audio_id, audio_title, audio_author_name,
                 like_count_text, like_count,
                 comment_count_text, comment_count, collect_count_text, collect_count,
-                share_count_text, share_count, crawling_algorithm, crawled_at
+                share_count_text, share_count, comments_json, crawling_algorithm, crawled_at
             ) VALUES (
                 %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s,
-                %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s
+                %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s
             ) ON DUPLICATE KEY UPDATE
                 video_url = VALUES(video_url),
                 video_thumbnail_url = VALUES(video_thumbnail_url),
@@ -294,6 +294,7 @@ class VideoRepository:
                 collect_count = VALUES(collect_count),
                 share_count_text = VALUES(share_count_text),
                 share_count = VALUES(share_count),
+                comments_json = VALUES(comments_json),
                 crawling_algorithm = VALUES(crawling_algorithm),
                 crawled_at = VALUES(crawled_at)
         """
@@ -303,7 +304,7 @@ class VideoRepository:
             data.audio_info_text, data.audio_id, data.audio_title, data.audio_author_name,
             data.like_count_text, data.like_count,
             data.comment_count_text, data.comment_count, data.collect_count_text, data.collect_count,
-            data.share_count_text, data.share_count, data.crawling_algorithm, data.crawled_at
+            data.share_count_text, data.share_count, data.comments_json, data.crawling_algorithm, data.crawled_at
         ))
 
     def save_video_light_data(self, data: VideoLightRawData):

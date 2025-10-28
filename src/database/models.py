@@ -46,6 +46,7 @@ class VideoHeavyRawData:
     collect_count: Optional[int] = None
     share_count_text: Optional[str] = None
     share_count: Optional[int] = None
+    comments_json: Optional[str] = None
     crawling_algorithm: str = ""
     crawled_at: datetime = datetime.now()
 

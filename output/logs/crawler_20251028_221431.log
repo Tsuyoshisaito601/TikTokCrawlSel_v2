@@ -1,0 +1,43 @@
+2025-10-28 22:14:39,233 - src.crawler.selenium_manager - INFO - CAPTCHA Solver付きのドライバーを作成します
+2025-10-28 22:14:39,301 - src.crawler.selenium_manager - INFO - Chromeドライバーの設定が完了しました
+2025-10-28 22:14:39,302 - __main__ - INFO - クロール用アカウントnana_ito@pivotx.jpでTikTokにログイン中...
+2025-10-28 22:15:01,903 - src.crawler.selenium_manager - DEBUG - captcha_present=True
+2025-10-28 22:15:01,903 - src.crawler.selenium_manager - INFO - [1/10] CAPTCHA 解決を試行中…
+2025-10-28 22:15:06,933 - src.crawler.selenium_manager - DEBUG - solve_CaptchaType.ROTATE_V2() => None
+2025-10-28 22:15:06,981 - src.crawler.selenium_manager - INFO - CAPTCHA まだ残存。3s 待って再試行
+2025-10-28 22:15:09,983 - src.crawler.selenium_manager - INFO - [2/10] CAPTCHA 解決を試行中…
+2025-10-28 22:15:45,587 - src.crawler.selenium_manager - ERROR - CAPTCHA 解決中に例外が発生: Neither puzzle, shapes, or rotate captcha was present.
+2025-10-28 22:15:45,601 - __main__ - INFO - クロール用アカウントnana_ito@pivotx.jpでTikTokへのログインに成功しました
+2025-10-28 22:15:45,609 - __main__ - INFO - クロール対象のお気に入りユーザー200件に対しbothデータのクロールを行います
+2025-10-28 22:15:45,614 - __main__ - INFO - ユーザー @yurileeeee のbothデータのクロールを開始
+2025-10-28 22:15:45,615 - __main__ - DEBUG - ユーザー @yurileeeee のページに移動中...
+2025-10-28 22:15:51,706 - __main__ - DEBUG - ユーザー @yurileeeee のページに移動しました
+2025-10-28 22:15:51,709 - __main__ - DEBUG - 動画の軽いデータの前半を取得中...
+2025-10-28 22:16:23,473 - __main__ - DEBUG - 100件の画像要素を目標にユーザーページをスクロールします...
+2025-10-28 22:16:25,661 - __main__ - DEBUG - 38件の画像要素を確認しました。
+2025-10-28 22:16:29,442 - __main__ - DEBUG - 53件の画像要素を確認しました。
+2025-10-28 22:16:34,843 - __main__ - DEBUG - 69件の画像要素を確認しました。
+2025-10-28 22:16:39,133 - __main__ - DEBUG - 85件の画像要素を確認しました。
+2025-10-28 22:16:44,431 - __main__ - DEBUG - 101件の画像要素を確認しました。
+2025-10-28 22:16:44,432 - __main__ - DEBUG - 目標以上の101件の画像要素を確認しました。スクロールを完了します。
+2025-10-28 22:16:44,449 - __main__ - DEBUG - 動画の軽いデータの前半を求めて100本の動画要素を走査します
+2025-10-28 22:16:50,458 - __main__ - DEBUG - 動画の軽いデータの前半を取得しました: 100件
+2025-10-28 22:16:50,459 - __main__ - DEBUG - ユーザー @yurileeeee のlast_crawledを更新します
+2025-10-28 22:16:50,482 - __main__ - INFO - ユーザー @yurileeeee の軽いデータののクロールを開始
+2025-10-28 22:16:50,483 - __main__ - DEBUG - 動画の軽いデータをパースおよび保存中...
+2025-10-28 22:16:50,493 - __main__ - DEBUG - light_like_datasをoutput\debug\light_like_datas_20251028_221650.csvに出力しました: 100件
+2025-10-28 22:16:51,331 - __main__ - INFO - 動画の軽いデータをパースおよび保存しました: 100件
+2025-10-28 22:16:51,332 - __main__ - INFO - バッチの軽いデータのクロールを完了しました。ユーザー名のクロールを開始します。
+2025-10-28 22:16:51,333 - __main__ - DEBUG - ユーザー名のデータを取得して保存中...
+2025-10-28 22:16:51,382 - __main__ - DEBUG - ユーザー名のデータを取得して保存しました: yurileeeee, Skinfluencer
+2025-10-28 22:16:51,383 - __main__ - DEBUG - 動画ページに移動中...: https://www.tiktok.com/@yurileeeee/video/7566242016540020023
+2025-10-28 22:16:55,258 - __main__ - DEBUG - 動画ページに移動しました: https://www.tiktok.com/@yurileeeee/video/7566242016540020023
+2025-10-28 22:16:55,258 - __main__ - DEBUG - 動画の重いデータを取得中...
+2025-10-28 22:16:55,393 - __main__ - DEBUG - 動画の重いデータを取得しました: https://www.tiktok.com/@yurileeeee/video/7566242016540020023
+2025-10-28 22:17:05,979 - __main__ - INFO - コメントを5件取得: https://www.tiktok.com/@yurileeeee/video/7566242016540020023
+2025-10-28 22:17:05,981 - __main__ - DEBUG - 動画の重いデータをパースおよび保存中...: https://www.tiktok.com/@yurileeeee/video/7566242016540020023
+2025-10-28 22:17:05,991 - __main__ - INFO - 動画の重いデータをパースおよび保存しました: https://www.tiktok.com/@yurileeeee/video/7566242016540020023
+2025-10-28 22:26:49,640 - __main__ - DEBUG - 動画ページの閉じるボタンをクリックしてユーザーページに戻ります...
+2025-10-28 22:27:05,979 - __main__ - WARNING - ユーザーページへの戻りに失敗 (無視して続行)
+2025-10-28 22:27:05,982 - src.crawler.selenium_manager - INFO - Chromeドライバーを終了しました
+2025-10-28 22:27:06,861 - __main__ - INFO - ユーザーにより中断されました
