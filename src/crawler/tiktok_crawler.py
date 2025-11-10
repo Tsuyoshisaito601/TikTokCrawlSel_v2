@@ -798,7 +798,7 @@ class TikTokCrawler:
         
         logger.debug(f"動画の重いデータを取得しました: {video_url}")
 
-        # コメント取得（上位N件）
+        # コメント取得（direct access想定、上位N件）
         comments = self.get_video_comments_from_video_page(max_comments=30)
         if comments:
             logger.info(f"コメントを{len(comments)}件取得: {video_url}")
@@ -820,31 +820,53 @@ class TikTokCrawler:
     def get_video_comments_from_video_page(self, max_comments: int = 30) -> List[str]:
         comments: List[str] = []
         try:
-            # コメントが未表示なら開く（存在すれば）
+            # コメントが未表示ならパネルを開く（direct access対応：ボタン→アイコンの順で探索）
             try:
-                self.driver.find_element(By.CSS_SELECTOR, "p[data-e2e='comment-level-1']")
+                self.driver.find_element(By.CSS_SELECTOR, "[data-e2e='comment-level-1']")
             except NoSuchElementException:
+                opened = False
                 try:
-                    btn = self.driver.find_element(
-                        By.CSS_SELECTOR, "[data-e2e='browse-comment-icon'],[data-e2e='comment-icon']"
-                    )
-                    self.driver.execute_script("arguments[0].click();", btn)
-                    self._random_sleep(0.8, 1.6)
+                    icon = self.driver.find_element(By.CSS_SELECTOR, "[data-e2e='comment-icon']")
+                    try:
+                        button = icon.find_element(By.XPATH, "ancestor::button[1]")
+                        logger.debug("コメントパネルを開くためボタンをクリックします（icon→button）")
+                        self.driver.execute_script("arguments[0].click();", button)
+                        opened = True
+                    except NoSuchElementException:
+                        logger.debug("コメントアイコンをクリックします（button祖先なし）")
+                        self.driver.execute_script("arguments[0].click();", icon)
+                        opened = True
                 except NoSuchElementException:
-                    pass
+                    try:
+                        button = self.driver.find_element(By.CSS_SELECTOR, "button[aria-label*='コメントを読む']")
+                        logger.debug("コメントパネルを開くためaria-labelボタンをクリックします")
+                        self.driver.execute_script("arguments[0].click();", button)
+                        opened = True
+                    except NoSuchElementException:
+                        try:
+                            btn_alt = self.driver.find_element(By.CSS_SELECTOR, "[data-e2e='browse-comment-icon'],[data-e2e='comment-icon']")
+                            logger.debug("コメントパネルを開くため代替アイコンをクリックします")
+                            self.driver.execute_script("arguments[0].click();", btn_alt)
+                            opened = True
+                        except NoSuchElementException:
+                            logger.debug("コメントパネルを開く要素が見つかりませんでした（スキップ）")
+                if opened:
+                    self._random_sleep(1.0, 1.8)
 
             deadline = time.time() + 10
             last_seen = 0
             while time.time() < deadline and len(comments) < max_comments:
-                elems = self.driver.find_elements(By.CSS_SELECTOR, "p[data-e2e='comment-level-1']")
+                elems = self.driver.find_elements(By.CSS_SELECTOR, "[data-e2e='comment-level-1']")
                 if elems:
                     self.driver.execute_script("arguments[0].scrollIntoView({block:'end'});", elems[-1])
                 self._random_sleep(0.6, 1.2)
 
-                elems = self.driver.find_elements(By.CSS_SELECTOR, "p[data-e2e='comment-level-1']")
+                elems = self.driver.find_elements(By.CSS_SELECTOR, "[data-e2e='comment-level-1']")
                 for e in elems[last_seen:]:
                     try:
-                        text = e.find_element(By.CSS_SELECTOR, "span[dir]").text.strip()
+                        # 翻訳UI（kol-extension-portal-wrap）配下を除外し、本文spanを優先抽出
+                        span = e.find_element(By.XPATH, ".//span[not(ancestor::div[contains(@class,'kol-extension-portal-wrap')])][1]")
+                        text = span.text.strip()
                         if text:
                             comments.append(text)
                             if len(comments) >= max_comments:
