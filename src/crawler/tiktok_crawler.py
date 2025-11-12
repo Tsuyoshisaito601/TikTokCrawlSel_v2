@@ -760,7 +760,7 @@ class TikTokCrawler:
         logger.debug(f"動画の重いデータを取得中...")
     
         video_url = self.driver.current_url
-        video_title = self.driver.find_element(By.CSS_SELECTOR, "[data-e2e='browse-video-desc']").text
+        video_title = self.driver.find_element(By.CSS_SELECTOR, "[data-e2e='video-desc'],[data-e2e='browse-video-desc']").text
         
         # より堅牢な投稿時間要素の取得（direct_access版）
         try:
