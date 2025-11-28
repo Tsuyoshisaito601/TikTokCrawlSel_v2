@@ -209,55 +209,113 @@ class TikTokCrawler:
         self.use_profile = use_profile
         self.chrome_user_data_dir = chrome_user_data_dir
         self.chrome_profile_directory = chrome_profile_directory
+
+        self.publisher: Optional[pubsub_v1.PublisherClient] = None
+        self._publisher_topic_path: Optional[str] = None
+
     def __enter__(self):
-        # クローラーアカウントを取得
-        if self.crawler_account_id is not None:
-            if self.engagement_type == "play":
-                # 再生数クロールの場合は、指定されたIDをplay_count_crawler_idとして使用
-                self.crawler_account = self.crawler_account_repo.get_play_count_crawler_account(self.crawler_account_id)
+        try:
+            # クローラーアカウントを取得
+            if self.crawler_account_id is not None:
+                if self.engagement_type == "play":
+                    # 再生数クロールの場合は、指定されたIDをplay_count_crawler_idとして使用
+                    self.crawler_account = self.crawler_account_repo.get_play_count_crawler_account(self.crawler_account_id)
+                else:
+                    # 通常のクロールの場合
+                    self.crawler_account = self.crawler_account_repo.get_crawler_account_by_id(self.crawler_account_id)
+                
+                if not self.crawler_account:
+                    account_type = "play_count_crawler_id" if self.engagement_type == "play" else "id"
+                    raise Exception(f"指定されたクローラーアカウント（{account_type}: {self.crawler_account_id}）が見つかりません")
             else:
-                # 通常のクロールの場合
-                self.crawler_account = self.crawler_account_repo.get_crawler_account_by_id(self.crawler_account_id)
+                self.crawler_account = self.crawler_account_repo.get_an_available_crawler_account()
+                if not self.crawler_account:
+                    raise Exception("利用可能なクローラーアカウントがありません")
             
-            if not self.crawler_account:
-                account_type = "play_count_crawler_id" if self.engagement_type == "play" else "id"
-                raise Exception(f"指定されたクローラーアカウント（{account_type}: {self.crawler_account_id}）が見つかりません")
-        else:
-            self.crawler_account = self.crawler_account_repo.get_an_available_crawler_account()
-            if not self.crawler_account:
-                raise Exception("利用可能なクローラーアカウントがありません")
-        
-        # Seleniumの設定
-        self.selenium_manager = SeleniumManager(
-            self.crawler_account.proxy,
-            self.sadcaptcha_api_key,
-            self.device_type,
-            use_profile=self.use_profile,
-            user_data_dir=self.chrome_user_data_dir,
-            profile_directory=self.chrome_profile_directory,
-        )
-        self.driver = self.selenium_manager.setup_driver()
-        self.wait = WebDriverWait(self.driver, 15)  # タイムアウトを15秒に変更
-
-        # ログイン
-        self._login()
-
-        # 最終クロール時間を更新（engagement_typeに応じて適切なテーブルを更新）
-        if self.engagement_type == "play":
-            self.crawler_account_repo.update_play_count_crawler_account_last_crawled(
-                self.crawler_account.id,
-                datetime.now()
+            # Seleniumの設定
+            self.selenium_manager = SeleniumManager(
+                self.crawler_account.proxy,
+                self.sadcaptcha_api_key,
+                self.device_type,
+                use_profile=self.use_profile,
+                user_data_dir=self.chrome_user_data_dir,
+                profile_directory=self.chrome_profile_directory,
             )
-        else:
-            self.crawler_account_repo.update_crawler_account_last_crawled(
-                self.crawler_account.id,
-                datetime.now()
-            )
-        return self
+            self.driver = self.selenium_manager.setup_driver()
+            self.wait = WebDriverWait(self.driver, 15)  # タイムアウトを15秒に変更
+
+            # ログイン
+            self._login()
+
+            # 最終クロール時間を更新（engagement_typeに応じて適切なテーブルを更新）
+            if self.engagement_type == "play":
+                self.crawler_account_repo.update_play_count_crawler_account_last_crawled(
+                    self.crawler_account.id,
+                    datetime.now()
+                )
+            else:
+                self.crawler_account_repo.update_crawler_account_last_crawled(
+                    self.crawler_account.id,
+                    datetime.now()
+                )
+            return self
+        except Exception:
+            self._cleanup_resources()
+            raise
 
     def __exit__(self, exc_type, exc_val, exc_tb):
+        self._cleanup_resources()
+
+    def _cleanup_resources(self):
+        """ブラウザやPub/Subクライアントを安全に破棄する"""
         if self.selenium_manager:
-            self.selenium_manager.quit_driver()
+            try:
+                self.selenium_manager.quit_driver()
+            except Exception:
+                logger.exception("Chromeドライバー終了時にエラーが発生しました")
+            finally:
+                self.selenium_manager = None
+                self.driver = None
+                self.wait = None
+        if self.publisher:
+            try:
+                close = getattr(self.publisher, "close", None)
+                if callable(close):
+                    close()
+                else:
+                    transport = getattr(self.publisher, "transport", None)
+                    if transport and hasattr(transport, "close"):
+                        transport.close()
+            except Exception:
+                logger.exception("Pub/Subクライアント終了時にエラーが発生しました")
+            finally:
+                self.publisher = None
+                self._publisher_topic_path = None
+
+    def _init_publisher(self):
+        if self.publisher:
+            return
+        self.publisher = pubsub_v1.PublisherClient()
+        self._publisher_topic_path = self.publisher.topic_path(project_id, "video-master-sync")
+
+    def _publish_video_master_sync(self, message_data: Dict):
+        if not project_id:
+            logger.warning("PROJECT_IDが設定されていないためPub/Sub送信をスキップします")
+            return
+
+        try:
+            if not self.publisher:
+                self._init_publisher()
+            if not self._publisher_topic_path:
+                logger.warning("Pub/Subトピックパスを解決できなかったため送信をスキップします")
+                return
+
+            message_bytes = json.dumps(message_data).encode("utf-8")
+            future = self.publisher.publish(self._publisher_topic_path, message_bytes)
+            message_id = future.result()
+            logger.info(f"Pub/Subメッセージを送信しました。Message ID: {message_id}")
+        except Exception as e:
+            logger.error(f"Pub/Subメッセージの送信に失敗しました: {e}", exc_info=True)
             
 
     def _random_sleep(self, min_seconds: float = 1.0, max_seconds: float = 3.0):
@@ -1177,10 +1235,6 @@ class TikTokCrawler:
         self.video_repo.save_video_heavy_data(data)
         logger.info(f"動画の重いデータをパースおよび保存しました: {data.video_url}")
 
-        publisher = pubsub_v1.PublisherClient()
-        
-        topic_path = publisher.topic_path(project_id, "video-master-sync")
-
         message_data = {
             "video_id": video_id,
             "video_url": heavy_data["video_url"],
@@ -1195,16 +1249,7 @@ class TikTokCrawler:
             "save_count": parse_tiktok_number(heavy_data.get("collect_count_text"))
         }
 
-        # メッセージをJSON形式にエンコード
-        message_str = json.dumps(message_data)
-        message_bytes = message_str.encode("utf-8")
-
-        try:
-            future = publisher.publish(topic_path, message_bytes)
-            message_id = future.result()
-            logger.info(f"Pub/Subメッセージを送信しました。Message ID: {message_id}")
-        except Exception as e:
-            logger.error(f"Pub/Subメッセージの送信に失敗しました: {e}", exc_info=True)
+        self._publish_video_master_sync(message_data)
 
 
     def _save_debug_csv(self, data: List[Dict], prefix: str) -> None:
@@ -1301,9 +1346,6 @@ class TikTokCrawler:
                 crawled_at=datetime.now()
             )
             self.video_repo.save_video_play_count_data(data)
-            publisher = pubsub_v1.PublisherClient()
-        
-            topic_path = publisher.topic_path(project_id, "video-master-sync")
 
             message_data = {
                 "video_id": play_data["video_id"],
@@ -1312,16 +1354,7 @@ class TikTokCrawler:
                 "play_count": parse_tiktok_number(play_data["play_count_text"])
             }
 
-            # メッセージをJSON形式にエンコード
-            message_str = json.dumps(message_data)
-            message_bytes = message_str.encode("utf-8")
-
-            try:
-                future = publisher.publish(topic_path, message_bytes)
-                message_id = future.result()
-                logger.info(f"Pub/Subメッセージを送信しました。Message ID: {message_id}")
-            except Exception as e:
-                logger.error(f"Pub/Subメッセージの送信に失敗しました: {e}", exc_info=True)
+            self._publish_video_master_sync(message_data)
         logger.info(f"動画の再生数の軽いデータをパースおよび保存しました: {len(light_play_datas)}件")
 
     # ユーザーの動画データをクロールする
