@@ -123,13 +123,13 @@ class FavoriteUserRepository:
         """クロール対象のお気に入りアカウントを取得"""
         query = """
             SELECT id, favorite_user_username, crawler_account_id,
-                   favorite_user_is_alive, crawl_priority, last_crawled_at, is_new_account,nickname,
-                   play_count_crawler_id
+                   favorite_user_is_alive, crawl_priority, last_crawled_at, is_new_account, nickname,
+                   play_count_crawler_id, parent_account_type, account_type
             FROM account_list
             WHERE crawler_account_id = %s
             AND favorite_user_is_alive = TRUE
-            ORDER BY 
-                CASE 
+            ORDER BY
+                CASE
                     WHEN last_crawled_at IS NULL THEN 1
                     ELSE 0
                 END DESC,
@@ -151,22 +151,24 @@ class FavoriteUserRepository:
                 last_crawled_at=row[5],
                 is_new_account=row[6],
                 nickname=row[7],
-                play_count_crawler_id=row[8]
+                play_count_crawler_id=row[8],
+                parent_account_type=row[9],
+                account_type=row[10]
             )
             for row in rows
         ]
-    
+
     def get_favorite_users_by_play_count_crawler_id(self, play_count_crawler_id: int, limit: int = 1000) -> List[FavoriteUser]:
         """クロール対象のお気に入りアカウントを取得"""
         query = """
             SELECT id, favorite_user_username, crawler_account_id,
-                   favorite_user_is_alive, crawl_priority, last_crawled_at, is_new_account,nickname,
-                   play_count_crawler_id
+                   favorite_user_is_alive, crawl_priority, last_crawled_at, is_new_account, nickname,
+                   play_count_crawler_id, parent_account_type, account_type
             FROM account_list
             WHERE play_count_crawler_id = %s
             AND favorite_user_is_alive = TRUE
-            ORDER BY 
-                CASE 
+            ORDER BY
+                CASE
                     WHEN last_crawled_at IS NULL THEN 1
                     ELSE 0
                 END DESC,
@@ -188,7 +190,9 @@ class FavoriteUserRepository:
                 last_crawled_at=row[5],
                 is_new_account=row[6],
                 nickname=row[7],
-                play_count_crawler_id=row[8]
+                play_count_crawler_id=row[8],
+                parent_account_type=row[9],
+                account_type=row[10]
             )
             for row in rows
         ]
