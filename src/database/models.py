@@ -18,10 +18,12 @@ class FavoriteUser:
     crawler_account_id: Optional[int] # 未割り当てかもしれないので
     favorite_user_is_alive: bool
     crawl_priority: int
-    last_crawled_at: Optional[datetime] 
+    last_crawled_at: Optional[datetime]
     is_new_account: bool
     play_count_crawler_id: Optional[int]
     nickname: Optional[str]
+    parent_account_type: Optional[str] = None
+    account_type: Optional[str] = None
 
 @dataclass
 class VideoHeavyRawData:

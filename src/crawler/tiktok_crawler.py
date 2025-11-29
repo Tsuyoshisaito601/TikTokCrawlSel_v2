@@ -213,6 +213,14 @@ class TikTokCrawler:
         self.publisher: Optional[pubsub_v1.PublisherClient] = None
         self._publisher_topic_path: Optional[str] = None
 
+    def _should_fetch_comments_for_user(self, user: FavoriteUser) -> bool:
+        """アカウント属性に応じてコメント取得対象か判定する"""
+        if user.parent_account_type == "アフィ":
+            return True
+        if user.parent_account_type == "インフルエンサー" and user.account_type == "美容":
+            return True
+        return False
+
     def __enter__(self):
         try:
             # クローラーアカウントを取得
@@ -739,9 +747,9 @@ class TikTokCrawler:
     # 動画ページの重いデータを取得する
     # Condition: 動画ページが開かれていること
     # Returns: 動画の重いデータ
-    def get_video_heavy_data_from_video_page(self) -> Dict[str, str]:
+    def get_video_heavy_data_from_video_page(self, fetch_comments: bool = True) -> Dict[str, str]:
         logger.debug(f"動画の重いデータを取得中...")
-    
+
         video_url = self.driver.current_url
         video_title = self.driver.find_element(By.CSS_SELECTOR, "[data-e2e='browse-video-desc'],[data-e2e='video-desc']").text
         # より堅牢な投稿時間要素の取得
@@ -797,11 +805,15 @@ class TikTokCrawler:
         logger.debug(f"動画の重いデータを取得しました: {video_url}")
 
         # コメント取得（上位N件）
-        comments = self.get_video_comments_from_video_page(max_comments=30)
-        if comments:
-            logger.info(f"コメントを{len(comments)}件取得: {video_url}")
+        comments: List[str] = []
+        if fetch_comments:
+            comments = self.get_video_comments_from_video_page(max_comments=30)
+            if comments:
+                logger.info(f"コメントを{len(comments)}件取得: {video_url}")
+            else:
+                logger.info(f"コメントは0件でした: {video_url}")
         else:
-            logger.info(f"コメントは0件でした: {video_url}")
+            logger.info(f"コメント取得対象外のためスキップ: {video_url}")
 
         return {
             "video_url": video_url,
@@ -814,9 +826,9 @@ class TikTokCrawler:
             "comments_json": json.dumps(comments, ensure_ascii=False),
             "crawling_algorithm": "selenium-human-like-1"
         }
-    def get_video_heavy_data_from_direct_access(self) -> Dict[str, str]:
+    def get_video_heavy_data_from_direct_access(self, fetch_comments: bool = True) -> Dict[str, str]:
         logger.debug(f"動画の重いデータを取得中...")
-    
+
         video_url = self.driver.current_url
         video_title = self.driver.find_element(By.CSS_SELECTOR, "[data-e2e='video-desc'],[data-e2e='browse-video-desc']").text
         
@@ -853,15 +865,19 @@ class TikTokCrawler:
         like_count_text = self.driver.find_element(By.CSS_SELECTOR, "strong[data-e2e='like-count']").text
         comment_count_text = self.driver.find_element(By.CSS_SELECTOR, "strong[data-e2e='comment-count']").text
         collect_count_text = self.driver.find_element(By.CSS_SELECTOR, "strong[data-e2e='undefined-count']").text
-        
+
         logger.debug(f"動画の重いデータを取得しました: {video_url}")
 
         # コメント取得（direct access想定、上位N件）
-        comments = self.get_video_comments_from_video_page(max_comments=30)
-        if comments:
-            logger.info(f"コメントを{len(comments)}件取得: {video_url}")
+        comments: List[str] = []
+        if fetch_comments:
+            comments = self.get_video_comments_from_video_page(max_comments=30)
+            if comments:
+                logger.info(f"コメントを{len(comments)}件取得: {video_url}")
+            else:
+                logger.info(f"コメントは0件でした: {video_url}")
         else:
-            logger.info(f"コメントは0件でした: {video_url}")
+            logger.info(f"コメント取得対象外のためスキップ: {video_url}")
 
         return {
             "video_url": video_url,
@@ -1366,6 +1382,8 @@ class TikTokCrawler:
     #     recrawl: 既に重いデータを取得済みの動画を再取得するかどうか
     def crawl_user(self, user: FavoriteUser, light_or_heavy: str = "both", max_videos_per_user: int = 100, recrawl: bool = False):
         logger.info(f"ユーザー @{user.favorite_user_username} の{light_or_heavy}データのクロールを開始")
+        fetch_comments = self._should_fetch_comments_for_user(user)
+        logger.debug(f"コメント取得判定: parent_account_type={user.parent_account_type}, account_type={user.account_type}, fetch={fetch_comments}")
 
         try:
             self.navigate_to_user_page(user.favorite_user_username)
@@ -1419,7 +1437,7 @@ class TikTokCrawler:
                 try:
                     self.navigate_to_video_page(light_like_data["video_url"])
                     try:
-                        heavy_data = self.get_video_heavy_data_from_video_page()
+                        heavy_data = self.get_video_heavy_data_from_video_page(fetch_comments=fetch_comments)
                         self.parse_and_save_video_heavy_data(heavy_data, light_like_data["video_thumbnail_url"],light_like_data.get("video_alt_info_text"),user.favorite_user_username,user.nickname)
                         self._random_sleep(10.0, 20.0) # こんくらいは見たほうがいいんじゃないかな未検証だけど
                     except Exception:
@@ -1490,9 +1508,9 @@ class TikTokCrawler:
                         try:
                             direct_access = self.navigate_to_video_page(light_like_data["video_url"])
                             if direct_access:
-                                heavy_data = self.get_video_heavy_data_from_direct_access()
+                                heavy_data = self.get_video_heavy_data_from_direct_access(fetch_comments=fetch_comments)
                             else:                            
-                                heavy_data = self.get_video_heavy_data_from_video_page()
+                                heavy_data = self.get_video_heavy_data_from_video_page(fetch_comments=fetch_comments)
 
 
 
@@ -1574,9 +1592,9 @@ class TikTokCrawler:
                     try:
                         direct_access = self.navigate_to_video_page(video["video_url"])
                         if direct_access:
-                            heavy_data = self.get_video_heavy_data_from_direct_access()
+                            heavy_data = self.get_video_heavy_data_from_direct_access(fetch_comments=fetch_comments)
                         else:                            
-                            heavy_data = self.get_video_heavy_data_from_video_page()
+                            heavy_data = self.get_video_heavy_data_from_video_page(fetch_comments=fetch_comments)
                         self.parse_and_save_video_heavy_data(heavy_data, video["video_thumbnail_url"],video.get("video_alt_info_text"),user.favorite_user_username,user.nickname)
                         self._random_sleep(10.0, 20.0)
                     except KeyboardInterrupt:
@@ -1834,4 +1852,3 @@ if __name__ == "__main__":
     except Exception:
         logger.exception("予期しないエラーが発生しました")
         sys.exit(1)
-
