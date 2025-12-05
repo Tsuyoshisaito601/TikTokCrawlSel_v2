@@ -64,6 +64,10 @@ class VideoLightRawData:
     like_count: Optional[int] = None
     crawling_algorithm: str = ""
     crawled_at: datetime = datetime.now()
+    post_time_text: Optional[str] = None
+    post_time: Optional[datetime] = None
+    comments_json: Optional[str] = None
+    audio_title: Optional[str] = None
 
 @dataclass
 class VideoPlayCountRawData:

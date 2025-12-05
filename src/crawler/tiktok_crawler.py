@@ -416,7 +416,7 @@ class TikTokCrawler:
                     self.driver = self.selenium_manager.setup_driver()
                     self.wait   = WebDriverWait(self.driver, 15)
 
-                    return self._login()           # ← ここで再ログイン
+                    return self._login()    # ← ここで再ログイン
                 else:
                     # それでもダメなら例外を上へ
                     raise

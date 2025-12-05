@@ -403,3 +403,144 @@ class VideoRepository:
             WHERE video_id = %s
         """
         self.db.execute_query(query, (is_alive, video_id))
+
+
+class InstaFavoriteUserRepository:
+    """Instagram専用の推しユーザーリポジトリ"""
+
+    def __init__(self, db: Database):
+        self.db = db
+
+    def _row_to_favorite_user(self, row) -> FavoriteUser:
+        return FavoriteUser(
+            id=row[0],
+            favorite_user_username=row[1],
+            crawler_account_id=row[2],
+            favorite_user_is_alive=row[3],
+            crawl_priority=row[4],
+            last_crawled_at=row[5],
+            is_new_account=row[6],
+            nickname=row[7],
+            play_count_crawler_id=row[8],
+            parent_account_type=row[9],
+            account_type=row[10],
+        )
+
+    def get_favorite_users(self, crawler_account_id: int, limit: int = 200) -> List[FavoriteUser]:
+        query = """
+            SELECT id, favorite_user_username, crawler_account_id,
+                   favorite_user_is_alive, crawl_priority, last_crawled_at, is_new_account, nickname,
+                   parent_account_type, account_type
+            FROM insta_account_list
+            WHERE crawler_account_id = %s
+              AND favorite_user_is_alive = TRUE
+            ORDER BY
+                CASE
+                    WHEN last_crawled_at IS NULL THEN 1
+                    ELSE 0
+                END DESC,
+                crawl_priority DESC,
+                last_crawled_at ASC
+            LIMIT %s
+        """
+        cursor = self.db.execute_query(query, (crawler_account_id, limit))
+        rows = cursor.fetchall()
+        cursor.close()
+        return [self._row_to_favorite_user(row) for row in rows]
+
+    def save_favorite_user_nickname(self, user_username: str, user_nickname: str):
+        """推しアカウントのニックネームを保存"""
+        query = """
+            INSERT INTO insta_account_list (favorite_user_username, nickname)
+            VALUES (%s, %s)
+            ON DUPLICATE KEY UPDATE
+                nickname = VALUES(nickname)
+        """
+        self.db.execute_query(query, (user_username, user_nickname))
+
+    def update_favorite_user_last_crawled(self, username: str, last_crawled_at: datetime):
+        """推しアカウントの最終クロール時刻を更新"""
+        query = """
+            UPDATE insta_account_list
+            SET last_crawled_at = %s
+            WHERE favorite_user_username = %s
+        """
+        self.db.execute_query(query, (last_crawled_at, username))
+
+    def update_favorite_user_is_alive(self, username: str, is_alive: bool):
+        """推しアカウントの生存フラグを更新"""
+        query = """
+            UPDATE insta_favorite_user
+            SET favorite_user_is_alive = %s
+            WHERE favorite_user_username = %s
+        """
+        self.db.execute_query(query, (is_alive, username))
+
+    def upsert_account_follower_history(
+        self, account_id, collection_date, follower_text, follower_count
+    ):
+        """insta_account_follower_history へUPSERT"""
+        query = """
+            INSERT INTO insta_account_follower_history (
+                account_id, collection_date, follower_text, follower_count
+            ) VALUES (
+                %s, %s, %s, %s
+            )
+            ON DUPLICATE KEY UPDATE
+                follower_text = VALUES(follower_text),
+                follower_count = VALUES(follower_count)
+        """
+        self.db.execute_query(query, (account_id, collection_date, follower_text, follower_count))
+
+
+class InstaVideoRepository:
+    """Instagram専用のライト動画リポジトリ"""
+
+    def __init__(self, db: Database):
+        self.db = db
+
+    def save_insta_light_data(self, data: VideoLightRawData):
+        query = """
+            INSERT INTO insta_raw_data (
+                video_url, video_id, user_username,
+                video_thumbnail_url, video_alt_info_text,
+                like_count_text, like_count,
+                crawling_algorithm, crawled_at,
+                post_time_text, post_time,
+                comments_json, audio_title
+            ) VALUES (
+                %s, %s, %s, %s, %s, %s, %s, %s, %s,
+                %s, %s, %s, %s
+            ) ON DUPLICATE KEY UPDATE
+                video_url = VALUES(video_url),
+                video_id = VALUES(video_id),
+                user_username = VALUES(user_username),
+                video_thumbnail_url = VALUES(video_thumbnail_url),
+                video_alt_info_text = VALUES(video_alt_info_text),
+                like_count_text = VALUES(like_count_text),
+                like_count = VALUES(like_count),
+                crawling_algorithm = VALUES(crawling_algorithm),
+                crawled_at = VALUES(crawled_at),
+                post_time_text = VALUES(post_time_text),
+                post_time = VALUES(post_time),
+                comments_json = VALUES(comments_json),
+                audio_title = VALUES(audio_title)
+        """
+        self.db.execute_query(
+            query,
+            (
+                data.video_url,
+                data.video_id,
+                data.user_username,
+                data.video_thumbnail_url,
+                data.video_alt_info_text,
+                data.like_count_text,
+                data.like_count,
+                data.crawling_algorithm,
+                data.crawled_at,
+                data.post_time_text,
+                data.post_time,
+                data.comments_json,
+                data.audio_title,
+            ),
+        )
