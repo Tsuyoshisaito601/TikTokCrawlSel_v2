@@ -16,7 +16,7 @@ from selenium.common.exceptions import TimeoutException, NoSuchElementException
 from ..database.database import Database
 from ..database.models import CrawlerAccount, FavoriteUser, VideoLightRawData
 from ..database.repositories import (
-    CrawlerAccountRepository,
+    InstaCrawlerAccountRepository,
     InstaFavoriteUserRepository,
     InstaVideoRepository,
 )
@@ -130,7 +130,12 @@ class InstaCrawler:
     PINNED_SVG_SELECTOR = "svg[title*='ピン留め']"
     VIDEO_POST_TIME_SELECTOR = "time.x1p4m5qa"
     VIDEO_AUDIO_INFO_SELECTOR = "span.x6ikm8r.x10wlt62.xlyipyv.xuxw1ft"
-    VIDEO_TITLE_SELECTOR = "h1._ap3a"
+    VIDEO_TITLE_SELECTOR = (
+        "h1._ap3a._aaco._aacu._aacx._aad7._aade, "
+        "h1._ap3a, "
+        "h1[data-testid='post-caption-title'], "
+        "span.x193iq5w.xeuugli.x13faqbe.x1vvkbs.xt0psk2.x1i0vuye.xvs91rp.xo1l8bm.x5n08af.x10wh9bi.xpm28yp.x8viiok.x1o7cslx.x126k92a"
+    )
     VIDEO_COMMENTS_SELECTOR = "ul._a9ym li._a9zj"
     USER_NICKNAME_SELECTOR = (
         "span.x1lliihq.x1plvlek.xryxfnj.x1n2onr6.xyejjpt.x15dsfln.x193iq5w."
@@ -144,7 +149,7 @@ class InstaCrawler:
 
     def __init__(
         self,
-        crawler_account_repo: CrawlerAccountRepository,
+        crawler_account_repo: InstaCrawlerAccountRepository,
         favorite_user_repo: InstaFavoriteUserRepository,
         video_repo: InstaVideoRepository,
         crawler_account_id: Optional[int] = None,
@@ -154,6 +159,7 @@ class InstaCrawler:
         use_profile: bool = False,
         chrome_user_data_dir: Optional[str] = None,
         chrome_profile_directory: Optional[str] = None,
+        skip_login: bool = False,
     ):
         self.crawler_account_repo = crawler_account_repo
         self.favorite_user_repo = favorite_user_repo
@@ -170,27 +176,32 @@ class InstaCrawler:
         self.use_profile = use_profile
         self.chrome_user_data_dir = chrome_user_data_dir
         self.chrome_profile_directory = chrome_profile_directory
+        self.skip_login = skip_login
 
         self.publisher: Optional[pubsub_v1.PublisherClient] = None
         self._publisher_topic_path: Optional[str] = None
 
     def __enter__(self):
         try:
-            if self.crawler_account_id is not None:
-                self.crawler_account = self.crawler_account_repo.get_crawler_account_by_id(
-                    self.crawler_account_id
-                )
-                if not self.crawler_account:
-                    raise Exception(
-                        f"指定されたクローラーアカウントが見つかりません: id={self.crawler_account_id}"
+            if not self.skip_login:
+                if self.crawler_account_id is not None:
+                    self.crawler_account = self.crawler_account_repo.get_crawler_account_by_id(
+                        self.crawler_account_id
                     )
+                    if not self.crawler_account:
+                        raise Exception(
+                            f"指定されたクローラーアカウントが見つかりません: id={self.crawler_account_id}"
+                        )
+                else:
+                    self.crawler_account = self.crawler_account_repo.get_an_available_crawler_account()
+                    if not self.crawler_account:
+                        raise Exception("利用可能なクローラーアカウントが存在しません")
+                proxy = self.crawler_account.proxy
             else:
-                self.crawler_account = self.crawler_account_repo.get_an_available_crawler_account()
-                if not self.crawler_account:
-                    raise Exception("利用可能なクローラーアカウントが存在しません")
+                proxy = None
 
             self.selenium_manager = SeleniumManager(
-                self.crawler_account.proxy,
+                proxy,
                 self.sadcaptcha_api_key,
                 self.device_type,
                 use_profile=self.use_profile,
@@ -200,11 +211,14 @@ class InstaCrawler:
             self.driver = self.selenium_manager.setup_driver()
             self.wait = WebDriverWait(self.driver, 15)
 
-            self._login()
-
-            self.crawler_account_repo.update_crawler_account_last_crawled(
-                self.crawler_account.id, datetime.now()
-            )
+            if not self.skip_login:
+                self._login()
+                self.crawler_account_repo.update_crawler_account_last_crawled(
+                    self.crawler_account.id, datetime.now()
+                )
+            else:
+                self.driver.get(self.BASE_URL)
+                self._random_sleep(2.0, 3.0)
             return self
         except Exception:
             self._cleanup_resources()
@@ -303,9 +317,10 @@ class InstaCrawler:
         self._random_sleep(2.0, 4.0)
 
         username_input = self.wait.until(
-            EC.presence_of_element_located(
+            EC.element_to_be_clickable(
                 (
                     By.CSS_SELECTOR,
+                    "input[name='username'][aria-label*='電話番号'],"
                     "input[name='username'][aria-label*='ユーザーネーム'],"
                     "input[name='username'][aria-label*='メールアドレス'],"
                     "input[name='username']",
@@ -317,13 +332,21 @@ class InstaCrawler:
         username_input.send_keys(self.crawler_account.username)
 
         self._random_sleep(1.0, 2.0)
-        password_input = self.driver.find_element(By.CSS_SELECTOR, "input[name='password']")
+        password_input = self.wait.until(
+            EC.element_to_be_clickable(
+                (
+                    By.CSS_SELECTOR,
+                    "input[name='password'][aria-label*='パスワード'],"
+                    "input[name='password']",
+                )
+            )
+        )
         password_input.clear()
         password_input.send_keys(self.crawler_account.password)
 
         self._random_sleep(1.0, 2.0)
         login_button = self.wait.until(
-            EC.element_to_be_clickable((By.CSS_SELECTOR, "button[type='submit']"))
+            EC.element_to_be_clickable((By.CSS_SELECTOR, "button[type='submit'], div button[type='submit']"))
         )
         self._random_sleep(2.0, 3.0)
         login_button.click()
@@ -437,7 +460,12 @@ class InstaCrawler:
 
         try:
             title_elem = self.driver.find_element(By.CSS_SELECTOR, self.VIDEO_TITLE_SELECTOR)
-            heavy_data["video_title"] = title_elem.text
+            # ハッシュタグを含む全文を innerText/textContent で取得（改行も保持）
+            heavy_data["video_title"] = (
+                title_elem.get_attribute("innerText")
+                or title_elem.get_attribute("textContent")
+                or title_elem.text
+            )
         except NoSuchElementException:
             logger.debug("動画タイトルが見つかりませんでした")
 
@@ -644,8 +672,10 @@ class InstaCrawler:
             elem = self.wait.until(
                 EC.presence_of_element_located((By.CSS_SELECTOR, "a[href$='/followers/'] span"))
             )
-            text = (elem.get_attribute("title") or elem.text or "").strip()
-            return text, parse_insta_number(text)
+            raw_text = (elem.get_attribute("title") or elem.text or "").strip()
+            # "フォロワー〇〇人" のような装飾を除去して数値化
+            cleaned_text = re.sub(r"[フォロワー人,\\s]", "", raw_text)
+            return raw_text, parse_insta_number(cleaned_text)
         except TimeoutException:
             logger.warning("フォロワー数の取得に失敗しました", exc_info=True)
         except NoSuchElementException:
@@ -759,6 +789,11 @@ def main():
         help="--use-profile 指定時に利用するプロファイルディレクトリ名 (例: Default, Profile 1)",
     )
     parser.add_argument(
+        "--test",
+        action="store_true",
+        help="Instagramホーム到達までのログイン確認のみを行い、到達後すぐ終了する",
+    )
+    parser.add_argument(
         "--mode",
         choices=["light", "test"],
         default="light",
@@ -773,11 +808,11 @@ def main():
         args.chrome_profile_directory = None
 
     with Database() as db:
-        crawler_account_repo = CrawlerAccountRepository(db)
+        crawler_account_repo = InstaCrawlerAccountRepository(db)
         favorite_user_repo = InstaFavoriteUserRepository(db)
         video_repo = InstaVideoRepository(db)
 
-        if args.mode == "test":
+        if args.test or args.mode == "test":
             crawler = InstaCrawler(
                 crawler_account_repo=crawler_account_repo,
                 favorite_user_repo=favorite_user_repo,
@@ -788,10 +823,11 @@ def main():
                 use_profile=args.use_profile,
                 chrome_user_data_dir=args.chrome_user_data_dir,
                 chrome_profile_directory=args.chrome_profile_directory,
+                skip_login=True,
             )
             try:
                 crawler.__enter__()
-                logger.info("testモード: ログインのみ完了。終了するにはEnterを押してください。")
+                logger.info("testモード: Instagramホームに到達しました。このまま調査してください。終了するには Enter を押してください。")
                 input()
             finally:
                 crawler.__exit__(None, None, None)

@@ -1,0 +1,4 @@
+2025-12-08 14:46:01,186 - src.crawler.selenium_manager - INFO - CAPTCHA Solver付きのドライバーを作成します
+2025-12-08 14:46:02,176 - src.crawler.selenium_manager - INFO - Chromeドライバーの設定が完了しました
+2025-12-08 14:46:02,179 - __main__ - INFO - クローラーアカウント nana_ito@pivotx.jp でInstagramにログインします...
+2025-12-08 14:46:21,356 - __main__ - INFO - ユーザーによって中断されました

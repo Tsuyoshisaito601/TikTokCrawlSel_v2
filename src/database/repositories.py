@@ -40,6 +40,74 @@ class CrawlerAccountRepository:
             last_crawled_at=row[5]
         )
 
+
+class InstaCrawlerAccountRepository:
+    """Instagram専用クローラアカウント用リポジトリ（insta_crawler_accounts）"""
+
+    def __init__(self, db: Database):
+        self.db = db
+
+    def get_an_available_crawler_account(self) -> Optional[CrawlerAccount]:
+        query = """
+            SELECT id, username, password, proxy, is_alive, last_crawled_at
+            FROM insta_crawler_accounts
+            WHERE is_alive = TRUE
+            ORDER BY 
+                CASE 
+                    WHEN last_crawled_at IS NULL THEN 1
+                    ELSE 0
+                END DESC,
+                last_crawled_at ASC
+            LIMIT 1
+        """
+        cursor = self.db.execute_query(query)
+        row = cursor.fetchone()
+        cursor.close()
+
+        if not row:
+            return None
+
+        return CrawlerAccount(
+            id=row[0],
+            username=row[1],
+            password=row[2],
+            proxy=row[3],
+            is_alive=row[4],
+            last_crawled_at=row[5],
+        )
+
+    def get_crawler_account_by_id(self, crawler_account_id: int) -> Optional[CrawlerAccount]:
+        query = """
+            SELECT id, username, password, proxy, is_alive, last_crawled_at
+            FROM insta_crawler_accounts
+            WHERE id = %s
+            AND is_alive = TRUE
+            LIMIT 1
+        """
+        cursor = self.db.execute_query(query, (crawler_account_id,))
+        row = cursor.fetchone()
+        cursor.close()
+
+        if not row:
+            return None
+
+        return CrawlerAccount(
+            id=row[0],
+            username=row[1],
+            password=row[2],
+            proxy=row[3],
+            is_alive=row[4],
+            last_crawled_at=row[5],
+        )
+
+    def update_crawler_account_last_crawled(self, crawler_account_id: int, last_crawled_at: datetime):
+        query = """
+            UPDATE insta_crawler_accounts
+            SET last_crawled_at = %s
+            WHERE id = %s
+        """
+        self.db.execute_query(query, (last_crawled_at, crawler_account_id))
+
     def update_crawler_account_last_crawled(self, crawler_account_id: int, last_crawled_at: datetime):
         """クローラーアカウントの最終クロール時間を更新"""
         query = """
@@ -421,9 +489,9 @@ class InstaFavoriteUserRepository:
             last_crawled_at=row[5],
             is_new_account=row[6],
             nickname=row[7],
-            play_count_crawler_id=row[8],
-            parent_account_type=row[9],
-            account_type=row[10],
+            play_count_crawler_id=None,
+            parent_account_type=row[8],
+            account_type=row[9],
         )
 
     def get_favorite_users(self, crawler_account_id: int, limit: int = 200) -> List[FavoriteUser]:

@@ -1,0 +1,52 @@
+2025-12-08 14:47:13,408 - src.crawler.selenium_manager - INFO - CAPTCHA Solver付きのドライバーを作成します
+2025-12-08 14:47:13,674 - src.crawler.selenium_manager - INFO - Chromeドライバーの設定が完了しました
+2025-12-08 14:47:13,676 - __main__ - INFO - クローラーアカウント nana_ito@pivotx.jp でInstagramにログインします...
+2025-12-08 14:47:17,645 - src.crawler.selenium_manager - INFO - Chromeドライバーを終了しました
+2025-12-08 14:47:18,570 - __main__ - ERROR - 予期しないエラーが発生しました
+Traceback (most recent call last):
+  File "D:\app_ssd\Buzzmiru\Crawlsel2\TikTokCrawlSel_v2\src\crawler\insta_crawler.py", line 820, in <module>
+    main()
+  File "D:\app_ssd\Buzzmiru\Crawlsel2\TikTokCrawlSel_v2\src\crawler\insta_crawler.py", line 799, in main
+    with InstaCrawler(
+  File "D:\app_ssd\Buzzmiru\Crawlsel2\TikTokCrawlSel_v2\src\crawler\insta_crawler.py", line 203, in __enter__
+    self._login()
+  File "D:\app_ssd\Buzzmiru\Crawlsel2\TikTokCrawlSel_v2\src\crawler\insta_crawler.py", line 305, in _login
+    username_input = self.wait.until(
+  File "D:\app_ssd\Buzzmiru\Crawlsel2\TikTokCrawlSel_v2\venv\lib\site-packages\selenium\webdriver\support\wait.py", line 96, in until
+    value = method(self._driver)
+  File "D:\app_ssd\Buzzmiru\Crawlsel2\TikTokCrawlSel_v2\venv\lib\site-packages\selenium\webdriver\support\expected_conditions.py", line 84, in _predicate
+    return driver.find_element(*locator)
+  File "D:\app_ssd\Buzzmiru\Crawlsel2\TikTokCrawlSel_v2\venv\lib\site-packages\selenium\webdriver\remote\webdriver.py", line 741, in find_element
+    return self.execute(Command.FIND_ELEMENT, {"using": by, "value": value})["value"]
+  File "D:\app_ssd\Buzzmiru\Crawlsel2\TikTokCrawlSel_v2\venv\lib\site-packages\selenium\webdriver\remote\webdriver.py", line 347, in execute
+    self.error_handler.check_response(response)
+  File "D:\app_ssd\Buzzmiru\Crawlsel2\TikTokCrawlSel_v2\venv\lib\site-packages\selenium\webdriver\remote\errorhandler.py", line 229, in check_response
+    raise exception_class(message, screen, stacktrace)
+selenium.common.exceptions.WebDriverException: Message: target frame detached
+  (failed to check if window was closed: disconnected: Unable to receive message from renderer)
+  (Session info: chrome=143.0.7499.41)
+Stacktrace:
+Symbols not available. Dumping unresolved backtrace:
+	0x8d0d23
+	0x8d0d64
+	0x6be52b
+	0x6ae913
+	0x6adb53
+	0x6cc4e6
+	0x7321d8
+	0x74d44c
+	0x72b2e6
+	0x6fd321
+	0x6fe1d4
+	0xb24d64
+	0xb2031b
+	0xb3cbfa
+	0x8eac28
+	0x8f2c2d
+	0x8d9028
+	0x8d91e9
+	0x8c3578
+	0x75935d49
+	0x76fcd6cb
+	0x76fcd651
+
