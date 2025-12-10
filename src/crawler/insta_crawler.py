@@ -144,6 +144,9 @@ class InstaCrawler:
         "x8viiok.x1o7cslx"
     )
 
+    # 閉じるボタン用セレクター（追加）
+    CLOSE_BUTTON_SELECTOR = "svg[aria-label='閉じる']"
+
     class InstaUserNotFoundException(Exception):
         pass
 
@@ -327,11 +330,11 @@ class InstaCrawler:
                 )
             )
         )
-        self._random_sleep(1.0, 2.0)
+        self._random_sleep(1.5, 2.5)
         username_input.clear()
         username_input.send_keys(self.crawler_account.username)
 
-        self._random_sleep(1.0, 2.0)
+        self._random_sleep(1.5, 2.5)
         password_input = self.wait.until(
             EC.element_to_be_clickable(
                 (
@@ -344,7 +347,7 @@ class InstaCrawler:
         password_input.clear()
         password_input.send_keys(self.crawler_account.password)
 
-        self._random_sleep(1.0, 2.0)
+        self._random_sleep(1.5, 2.5)
         login_button = self.wait.until(
             EC.element_to_be_clickable((By.CSS_SELECTOR, "button[type='submit'], div button[type='submit']"))
         )
@@ -383,13 +386,13 @@ class InstaCrawler:
         reels_path = f"/{username}/reels/"
         reels_url = f"{self.BASE_URL}{reels_path}"
         logger.debug(f"���[�U�[ @{username} �̃��[�����u�ւ�J�ڂ��܂�")
-        self._random_sleep(1.0, 2.0)
+        self._random_sleep(1.5, 2.5)
         try:
             reels_tab = WebDriverWait(self.driver, 10).until(
                 EC.element_to_be_clickable((By.CSS_SELECTOR, f"a[href$='{reels_path}']"))
             )
             reels_tab.click()
-            self._random_sleep(1.0, 2.0)
+            self._random_sleep(1.5, 2.5)
         except TimeoutException:
             logger.info("�u���[���̃^�u���ݒu�����ł���悤�Ȃ��̂ŁA����URL�ɃE�B���h�E���J�ڂ��܂�")
             self.driver.get(reels_url)
@@ -405,7 +408,7 @@ class InstaCrawler:
             )
         except TimeoutException:
             logger.warning("���[�����u�̃R���e���c�[�̂�ǂ݂Ȃ����ߐ���")
-        self._random_sleep(1.0, 2.0)
+        self._random_sleep(1.5, 2.5)
 
     def scroll_user_page(self, need_items_count: int = 100, max_scroll_attempts: int = None) -> bool:
         logger.debug(f"{need_items_count} 件以上の投稿を目標にユーザーページをスクロールします")
@@ -415,7 +418,7 @@ class InstaCrawler:
             if len(posts) >= need_items_count:
                 return True
             self.driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
-            self._random_sleep(1.0, 2.0)
+            self._random_sleep(1.5, 2.5)
         return len(self.driver.find_elements(By.CSS_SELECTOR, "article a[href*='/p/']")) >= need_items_count
 
     def scroll_reels_page(self, need_items_count: int = 100, max_scroll_attempts: int = None) -> bool:
@@ -426,7 +429,7 @@ class InstaCrawler:
             if len(items) >= need_items_count:
                 return True
             self.driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
-            self._random_sleep(1.0, 2.0)
+            self._random_sleep(1.5, 2.5)
         return len(self.driver.find_elements(By.CSS_SELECTOR, self.REEL_ITEM_CONTAINER_SELECTOR)) >= need_items_count
 
 
@@ -484,9 +487,149 @@ class InstaCrawler:
 
         return heavy_data
 
+    def _scroll_to_element(self, element):
+        """要素が見える位置までスクロールする"""
+        try:
+            self.driver.execute_script(
+                "arguments[0].scrollIntoView({behavior: 'smooth', block: 'center'});",
+                element
+            )
+            self._random_sleep(0.5, 1.0)
+        except Exception:
+            logger.warning("要素へのスクロールに失敗しました", exc_info=True)
+
+    def _click_reel_item_by_index(self, index: int) -> bool:
+        """リールページで指定インデックスのリール要素をクリックして詳細ページに遷移する"""
+        try:
+            reel_items = self.driver.find_elements(By.CSS_SELECTOR, self.REEL_ITEM_CONTAINER_SELECTOR)
+            if index >= len(reel_items):
+                logger.warning(f"リール要素が見つかりません: index={index}, 現在の要素数={len(reel_items)}")
+                return False
+            
+            target_elem = reel_items[index]
+            
+            # 要素の位置までスクロール
+            self._scroll_to_element(target_elem)
+            self._random_sleep(0.8, 1.5)
+            
+            # リール内のリンク要素をクリック
+            link_elem = target_elem.find_element(By.CSS_SELECTOR, "a[href*='/reel/']")
+            link_elem.click()
+            self._random_sleep(2.0, 3.5)
+            
+            # 詳細ページへの遷移を確認（閉じるボタンが表示されることで確認）
+            WebDriverWait(self.driver, 10).until(
+                EC.presence_of_element_located((By.CSS_SELECTOR, self.CLOSE_BUTTON_SELECTOR))
+            )
+            return True
+        except TimeoutException:
+            logger.warning(f"リール詳細ページへの遷移がタイムアウトしました: index={index}")
+            return False
+        except Exception:
+            logger.warning(f"リール要素のクリックに失敗しました: index={index}", exc_info=True)
+            return False
+
+    def _click_close_button_to_return(self, username: str):
+        """閉じるボタン（×）をクリックしてリールページに戻る"""
+        try:
+            # 閉じるボタン（svg）を探す
+            close_svg = WebDriverWait(self.driver, 10).until(
+                EC.element_to_be_clickable((By.CSS_SELECTOR, self.CLOSE_BUTTON_SELECTOR))
+            )
+            
+            # svgの親要素（div[role="button"]）を取得してクリック
+            close_button = close_svg.find_element(By.XPATH, "./ancestor::div[@role='button']")
+            close_button.click()
+            self._random_sleep(1.5, 2.5)
+            
+            # リールページに戻れたか確認
+            WebDriverWait(self.driver, 10).until(
+                EC.presence_of_element_located((By.CSS_SELECTOR, self.REEL_ITEM_CONTAINER_SELECTOR))
+            )
+            logger.debug("閉じるボタンでリールページに戻りました")
+            
+        except TimeoutException:
+            logger.warning("閉じるボタンが見つからないか、リールページへの復帰がタイムアウトしました")
+            # フォールバック: URL直接遷移
+            self._fallback_navigate_to_reels_page(username)
+        except Exception:
+            logger.warning("閉じるボタンでの遷移に失敗しました", exc_info=True)
+            self._fallback_navigate_to_reels_page(username)
+
+    def _fallback_navigate_to_reels_page(self, username: str):
+        """フォールバック: URL遷移でリールページに戻る"""
+        logger.debug("URL遷移でリールページに戻ります")
+        self.driver.get(f"{self.BASE_URL}/{username}/reels/")
+        self._random_sleep(2.0, 3.0)
+        try:
+            WebDriverWait(self.driver, 10).until(
+                EC.presence_of_element_located((By.CSS_SELECTOR, self.REEL_ITEM_CONTAINER_SELECTOR))
+            )
+        except TimeoutException:
+            logger.warning("リールページへのURL遷移後、要素が見つかりませんでした")
+
     def collect_reel_heavy_data_map(
+        self, light_like_datas: List[Dict], user_username: str = None,
+        fetch_comments: bool = True, comment_limit: int = 20
+    ) -> Dict[str, Dict[str, Optional[str]]]:
+        """
+        リール詳細データを収集する。
+        各リールについて、ユーザーリールページからスクロール＋クリックで遷移し、
+        詳細取得後は閉じるボタンでリールページに戻る。
+        """
+        heavy_map: Dict[str, Dict[str, Optional[str]]] = {}
+        
+        if not user_username and light_like_datas:
+            user_username = light_like_datas[0].get("user_username")
+        
+        if not user_username:
+            logger.warning("user_usernameが不明なため、URL遷移方式にフォールバックします")
+            return self._collect_reel_heavy_data_map_by_url(light_like_datas, fetch_comments, comment_limit)
+        
+        # リールページにいることを確認（いなければ遷移）
+        reels_path = f"/{user_username}/reels/"
+        if reels_path not in self.driver.current_url:
+            self.navigate_to_reels_page(user_username)
+        
+        # スクロールしてすべての対象リールを読み込む
+        self.scroll_reels_page(len(light_like_datas))
+        
+        for index, like_data in enumerate(light_like_datas):
+            video_url = like_data.get("video_url")
+            video_id = like_data.get("video_id")
+            if not video_url or not video_id:
+                continue
+            
+            try:
+                # リールページから対象リールをクリックして遷移
+                if self._click_reel_item_by_index(index):
+                    heavy_data = self.get_video_heavy_data_from_video_page(
+                        fetch_comments=fetch_comments, comment_limit=comment_limit
+                    )
+                    heavy_map[video_id] = heavy_data
+                else:
+                    logger.warning(f"リール詳細ページへの遷移に失敗したためスキップ: {video_url}")
+                
+                # 閉じるボタンをクリックしてリールページに戻る
+                self._click_close_button_to_return(user_username)
+                
+            except KeyboardInterrupt:
+                raise
+            except Exception:
+                logger.warning(f"動画ページ遷移または詳細取得で失敗: {video_url}", exc_info=True)
+                # エラー発生時もリールページに戻る試み
+                try:
+                    self._click_close_button_to_return(user_username)
+                except Exception:
+                    pass
+                continue
+        
+        return heavy_map
+
+    def _collect_reel_heavy_data_map_by_url(
         self, light_like_datas: List[Dict], fetch_comments: bool = True, comment_limit: int = 20
     ) -> Dict[str, Dict[str, Optional[str]]]:
+        """フォールバック用: URL遷移方式で詳細データを収集する（旧実装）"""
         heavy_map: Dict[str, Dict[str, Optional[str]]] = {}
         for like_data in light_like_datas:
             video_url = like_data.get("video_url")
@@ -526,7 +669,7 @@ class InstaCrawler:
         video_stats: List[Dict[str, str]] = []
 
         self.navigate_to_reels_page(user_username)
-        self._random_sleep(3.0, 4.5)
+        self._random_sleep(5.0, 7.0)
 
         self.scroll_reels_page(max_videos)
         post_elements = self.driver.find_elements(By.CSS_SELECTOR, self.REEL_ITEM_CONTAINER_SELECTOR)
@@ -576,11 +719,13 @@ class InstaCrawler:
                         "user_username": user_username,
                         "video_thumbnail_url": thumbnail_url,
                         "video_alt_info_text": "",
-                        "like_count_text": view_count_text,
+                        "like_count_text": None,
+                        "play_count_text": view_count_text,
                         "crawling_algorithm": "instagram-reels-grid-v1",
                         "is_pinned": is_pinned,
                     }
                 )
+                self._random_sleep(0.8, 1.5)
             except NoSuchElementException:
                 logger.warning("リールのメタデータ取得で要素不足が発生しました", exc_info=True)
                 continue
@@ -637,8 +782,10 @@ class InstaCrawler:
                 user_username=like_data["user_username"],
                 video_thumbnail_url=like_data["video_thumbnail_url"],
                 video_alt_info_text=video_title_text,
-                like_count_text=like_data.get("like_count_text"),
+                like_count_text=None,
                 like_count=None,
+                play_count_text=like_data.get("play_count_text"),
+                play_count=parse_insta_number(like_data.get("play_count_text")),
                 crawling_algorithm=like_data["crawling_algorithm"],
                 crawled_at=datetime.now(),
                 post_time_text=like_data.get("post_time_text"),
@@ -647,6 +794,7 @@ class InstaCrawler:
                 audio_title=audio_title,
             )
             self.video_repo.save_insta_light_data(data)
+            self.video_repo.save_insta_heavy_data(data)
 
             message_data = {
                 "video_id": data.video_id,
@@ -655,7 +803,8 @@ class InstaCrawler:
                 "user_nickname": user_nickname,
                 "video_thumbnail_url": data.video_thumbnail_url,
                 "video_title": video_title_text,
-                "like_count": data.like_count,
+                "like_count": None,
+                "play_count": data.play_count,
                 "audio_info_text": like_data.get("audio_info_text"),
                 "audio_title": audio_title,
                 "post_time_text": like_data.get("post_time_text"),
@@ -708,7 +857,12 @@ class InstaCrawler:
         light_like_datas = self.get_video_like_dates_from_user_page(
             user.favorite_user_username, max_videos=max_videos_per_user
         )
-        heavy_data_map = self.collect_reel_heavy_data_map(light_like_datas, fetch_comments=True)
+        # user_username引数を追加
+        heavy_data_map = self.collect_reel_heavy_data_map(
+            light_like_datas,
+            user_username=user.favorite_user_username,
+            fetch_comments=True
+        )
         for like_data in light_like_datas:
             heavy = heavy_data_map.get(like_data["video_id"])
             if heavy:

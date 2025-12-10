@@ -548,7 +548,7 @@ class TikTokCrawler:
     def get_video_light_like_datas_from_user_page(self, max_videos: int = 100) -> List[Dict[str, str]]:
         logger.debug(f"動画の軽いデータの前半を取得中...")
         video_stats = []
-        self._random_sleep(20.0, 25.0)
+        self._random_sleep(30.0, 35.0)
         
         self.scroll_user_page(max_videos)
         video_elements = self.driver.find_elements(By.CSS_SELECTOR, "[data-e2e='user-post-item']")
@@ -1522,7 +1522,7 @@ class TikTokCrawler:
                             #     last_post_time = post_time
                             
                             processed_urls.add(light_like_data["video_url"])
-                            self._random_sleep(5.0, 15.0)
+                            self._random_sleep(10.0, 20.0)
                                     
                                 
                         except KeyboardInterrupt:
@@ -1596,7 +1596,7 @@ class TikTokCrawler:
                         else:                            
                             heavy_data = self.get_video_heavy_data_from_video_page(fetch_comments=fetch_comments)
                         self.parse_and_save_video_heavy_data(heavy_data, video["video_thumbnail_url"],video.get("video_alt_info_text"),user.favorite_user_username,user.nickname)
-                        self._random_sleep(5.0, 15.0)
+                        self._random_sleep(10.0, 20.0)
                     except KeyboardInterrupt:
                         raise
                     except Exception:

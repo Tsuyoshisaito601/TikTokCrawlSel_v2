@@ -562,17 +562,53 @@ class InstaFavoriteUserRepository:
 
 
 class InstaVideoRepository:
-    """Instagram専用のライト動画リポジトリ"""
+    """Instagram専用のライト/ヘビー動画リポジトリ"""
 
     def __init__(self, db: Database):
         self.db = db
 
     def save_insta_light_data(self, data: VideoLightRawData):
         query = """
-            INSERT INTO insta_raw_data (
+            INSERT INTO insta_light_raw_data (
                 video_url, video_id, user_username,
                 video_thumbnail_url, video_alt_info_text,
-                like_count_text, like_count,
+                play_count_text, play_count,
+                crawling_algorithm, crawled_at
+            ) VALUES (
+                %s, %s, %s, %s, %s, %s, %s, %s, %s
+            ) ON DUPLICATE KEY UPDATE
+                video_url = VALUES(video_url),
+                video_id = VALUES(video_id),
+                user_username = VALUES(user_username),
+                video_thumbnail_url = VALUES(video_thumbnail_url),
+                video_alt_info_text = VALUES(video_alt_info_text),
+                play_count_text = VALUES(play_count_text),
+                play_count = VALUES(play_count),
+                crawling_algorithm = VALUES(crawling_algorithm),
+                crawled_at = VALUES(crawled_at)
+        """
+        self.db.execute_query(
+            query,
+            (
+                data.video_url,
+                data.video_id,
+                data.user_username,
+                data.video_thumbnail_url,
+                data.video_alt_info_text,
+                data.play_count_text,
+                data.play_count,
+                data.crawling_algorithm,
+                data.crawled_at,
+            ),
+        )
+
+    def save_insta_heavy_data(self, data: VideoLightRawData):
+        """リール動画ページから取得した詳細データを保存"""
+        query = """
+            INSERT INTO insta_heavy_raw_data (
+                video_url, video_id, user_username,
+                video_thumbnail_url, video_title,
+                play_count_text, play_count,
                 crawling_algorithm, crawled_at,
                 post_time_text, post_time,
                 comments_json, audio_title
@@ -584,9 +620,9 @@ class InstaVideoRepository:
                 video_id = VALUES(video_id),
                 user_username = VALUES(user_username),
                 video_thumbnail_url = VALUES(video_thumbnail_url),
-                video_alt_info_text = VALUES(video_alt_info_text),
-                like_count_text = VALUES(like_count_text),
-                like_count = VALUES(like_count),
+                video_title = VALUES(video_title),
+                play_count_text = VALUES(play_count_text),
+                play_count = VALUES(play_count),
                 crawling_algorithm = VALUES(crawling_algorithm),
                 crawled_at = VALUES(crawled_at),
                 post_time_text = VALUES(post_time_text),
@@ -601,9 +637,9 @@ class InstaVideoRepository:
                 data.video_id,
                 data.user_username,
                 data.video_thumbnail_url,
-                data.video_alt_info_text,
-                data.like_count_text,
-                data.like_count,
+                data.video_alt_info_text,  # video title
+                data.play_count_text,
+                data.play_count,
                 data.crawling_algorithm,
                 data.crawled_at,
                 data.post_time_text,

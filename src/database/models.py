@@ -60,8 +60,10 @@ class VideoLightRawData:
     user_username: str = ""  # 動画を投稿したアカウントのユーザー名
     video_thumbnail_url: str = ""
     video_alt_info_text: str = ""  # {audio_author_name}の{audio_title}を使用して{user_nickname}が作成した{video_title}
-    like_count_text: Optional[str] = None
-    like_count: Optional[int] = None
+    like_count_text: Optional[str] = None  # Instagramリールでは未使用
+    like_count: Optional[int] = None  # Instagramリールでは未使用
+    play_count_text: Optional[str] = None
+    play_count: Optional[int] = None
     crawling_algorithm: str = ""
     crawled_at: datetime = datetime.now()
     post_time_text: Optional[str] = None
