@@ -1,0 +1,54 @@
+2025-12-08 17:17:34,089 - src.database.database - INFO - データベースに接続しました
+2025-12-08 17:17:42,002 - src.crawler.selenium_manager - INFO - CAPTCHA Solver付きのドライバーを作成します
+2025-12-08 17:17:42,182 - src.crawler.selenium_manager - INFO - Chromeドライバーの設定が完了しました
+2025-12-08 17:17:42,185 - __main__ - INFO - クローラーアカウント nana_ito@pivotx.jp でInstagramにログインします...
+2025-12-08 17:17:58,480 - src.crawler.selenium_manager - INFO - Chromeドライバーを終了しました
+2025-12-08 17:17:59,865 - src.database.database - INFO - データベース接続を閉じました
+2025-12-08 17:17:59,866 - __main__ - ERROR - 予期しないエラーが発生しました
+Traceback (most recent call last):
+  File "D:\app_ssd\Buzzmiru\Crawlsel2\TikTokCrawlSel_v2\src\crawler\insta_crawler.py", line 820, in <module>
+    main()
+  File "D:\app_ssd\Buzzmiru\Crawlsel2\TikTokCrawlSel_v2\src\crawler\insta_crawler.py", line 799, in main
+    with InstaCrawler(
+  File "D:\app_ssd\Buzzmiru\Crawlsel2\TikTokCrawlSel_v2\src\crawler\insta_crawler.py", line 203, in __enter__
+    self._login()
+  File "D:\app_ssd\Buzzmiru\Crawlsel2\TikTokCrawlSel_v2\src\crawler\insta_crawler.py", line 305, in _login
+    username_input = self.wait.until(
+  File "D:\app_ssd\Buzzmiru\Crawlsel2\TikTokCrawlSel_v2\venv\lib\site-packages\selenium\webdriver\support\wait.py", line 96, in until
+    value = method(self._driver)
+  File "D:\app_ssd\Buzzmiru\Crawlsel2\TikTokCrawlSel_v2\venv\lib\site-packages\selenium\webdriver\support\expected_conditions.py", line 84, in _predicate
+    return driver.find_element(*locator)
+  File "D:\app_ssd\Buzzmiru\Crawlsel2\TikTokCrawlSel_v2\venv\lib\site-packages\selenium\webdriver\remote\webdriver.py", line 741, in find_element
+    return self.execute(Command.FIND_ELEMENT, {"using": by, "value": value})["value"]
+  File "D:\app_ssd\Buzzmiru\Crawlsel2\TikTokCrawlSel_v2\venv\lib\site-packages\selenium\webdriver\remote\webdriver.py", line 347, in execute
+    self.error_handler.check_response(response)
+  File "D:\app_ssd\Buzzmiru\Crawlsel2\TikTokCrawlSel_v2\venv\lib\site-packages\selenium\webdriver\remote\errorhandler.py", line 229, in check_response
+    raise exception_class(message, screen, stacktrace)
+selenium.common.exceptions.WebDriverException: Message: target frame detached
+  (failed to check if window was closed: disconnected: Unable to receive message from renderer)
+  (Session info: chrome=143.0.7499.41)
+Stacktrace:
+Symbols not available. Dumping unresolved backtrace:
+	0x750d23
+	0x750d64
+	0x53e52b
+	0x52e913
+	0x52db53
+	0x54c4e6
+	0x5b21d8
+	0x5cd44c
+	0x5ab2e6
+	0x57d321
+	0x57e1d4
+	0x9a4d64
+	0x9a031b
+	0x9bcbfa
+	0x76ac28
+	0x772c2d
+	0x759028
+	0x7591e9
+	0x743578
+	0x75935d49
+	0x76fcd6cb
+	0x76fcd651
+

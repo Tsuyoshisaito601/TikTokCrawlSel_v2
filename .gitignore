@@ -1,3 +1,6 @@
 .env
 tiktok-analytics-prod-451609-99506c459fbc.json
 venv/
+.venv/
+*.log
+logs/

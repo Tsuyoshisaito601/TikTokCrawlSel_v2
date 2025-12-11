@@ -1,0 +1,4 @@
+2025-12-08 17:24:29,786 - src.crawler.selenium_manager - INFO - CAPTCHA Solver付きのドライバーを作成します
+2025-12-08 17:24:29,947 - src.crawler.selenium_manager - INFO - Chromeドライバーの設定が完了しました
+2025-12-08 17:24:33,651 - __main__ - INFO - testモード: Instagramホームに到達したので終了します。
+2025-12-08 17:24:33,655 - src.crawler.selenium_manager - INFO - Chromeドライバーを終了しました

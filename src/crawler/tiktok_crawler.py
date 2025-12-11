@@ -416,7 +416,7 @@ class TikTokCrawler:
                     self.driver = self.selenium_manager.setup_driver()
                     self.wait   = WebDriverWait(self.driver, 15)
 
-                    return self._login()           # ← ここで再ログイン
+                    return self._login()    # ← ここで再ログイン
                 else:
                     # それでもダメなら例外を上へ
                     raise
@@ -548,7 +548,7 @@ class TikTokCrawler:
     def get_video_light_like_datas_from_user_page(self, max_videos: int = 100) -> List[Dict[str, str]]:
         logger.debug(f"動画の軽いデータの前半を取得中...")
         video_stats = []
-        self._random_sleep(20.0, 25.0)
+        self._random_sleep(30.0, 35.0)
         
         self.scroll_user_page(max_videos)
         video_elements = self.driver.find_elements(By.CSS_SELECTOR, "[data-e2e='user-post-item']")
@@ -568,9 +568,9 @@ class TikTokCrawler:
                 thumbnail_url = thumbnail_element.get_attribute("src")
                 video_alt_info_text = thumbnail_element.get_attribute("alt")
                 
-                # いいね数を取得（表示形式のまま）
-                like_count_element = video_element.find_element(By.CSS_SELECTOR, "[data-e2e='video-views']") # video-viewsといいながらいいね数
-                like_count_text = like_count_element.text
+                # 再生数を取得（表示形式のまま）
+                play_count_element = video_element.find_element(By.CSS_SELECTOR, "[data-e2e='video-views']")
+                play_count_text = play_count_element.text
                 
                 video_stats.append({
                     "video_url": video_url,
@@ -578,7 +578,7 @@ class TikTokCrawler:
                     "user_username": user_username,
                     "video_thumbnail_url": thumbnail_url,
                     "video_alt_info_text": video_alt_info_text,
-                    "like_count_text": like_count_text,
+                    "play_count_text": play_count_text,  # like_count_text → play_count_text
                     "crawling_algorithm": "selenium-human-like-1"
                 })
             
@@ -1303,7 +1303,7 @@ class TikTokCrawler:
     # Args:
     #     light_like_datas: 動画の軽いデータの前半(辞書型)のリスト
     #     light_play_datas: 動画の軽いデータの後半(辞書型)のリスト
-    def parse_and_save_video_light_datas(self, light_like_datas: List[Dict]):
+    def parse_and_save_video_light_datas(self, light_like_datas: List[Dict], light_play_datas: Optional[List[Dict]] = None):
         logger.debug(f"動画の軽いデータをパースおよび保存中...")
 
         # デバッグ用：CSVファイルに出力
@@ -1331,14 +1331,22 @@ class TikTokCrawler:
                 user_username=like_data["user_username"],
                 video_thumbnail_url=like_data["video_thumbnail_url"],
                 video_alt_info_text=like_data["video_alt_info_text"],
-                like_count_text=like_data["like_count_text"],
-                like_count=parse_tiktok_number(like_data["like_count_text"]),
+                play_count_text=like_data["play_count_text"],
+                play_count=parse_tiktok_number(like_data["play_count_text"]),
                 crawling_algorithm=like_data["crawling_algorithm"],
                 crawled_at=datetime.now()
             )
 
-            # logger.debug(f"動画の軽いデータを保存します: {data.video_id} -> {data.play_count}, {data.like_count}")
             self.video_repo.save_video_light_data(data)
+            
+            # Pub/Sub送信
+            message_data = {
+                "video_id": like_data["video_id"],
+                "video_url": like_data["video_url"],
+                "user_username": like_data["user_username"],
+                "play_count": parse_tiktok_number(like_data["play_count_text"])
+            }
+            self._publish_video_master_sync(message_data)
             
         logger.info(f"動画の軽いデータをパースおよび保存しました: {len(light_like_datas)}件")
 
@@ -1348,7 +1356,7 @@ class TikTokCrawler:
     # Args:
     #     light_play_datas: 動画の再生数の軽いデータの前半(辞書型)のリスト
     def parse_and_save_play_count_datas(self, light_play_datas: List[Dict]):
-        logger.debug(f"動画の再生数の軽いデータをパースおよび保存中...")    
+        logger.debug(f"動画の再生数の軽いデータをパースおよび保存中...")
 
         for play_data in light_play_datas:
             data = VideoPlayCountRawData(
@@ -1373,6 +1381,45 @@ class TikTokCrawler:
             self._publish_video_master_sync(message_data)
         logger.info(f"動画の再生数の軽いデータをパースおよび保存しました: {len(light_play_datas)}件")
 
+    def attach_play_counts(self, light_like_datas: List[Dict], light_play_datas: List[Dict]) -> List[Dict]:
+        """video_idを主キーに再生数をマージし、見つからない場合はサムネイルのエッセンスでフォールバック"""
+        play_count_by_id = {}
+        play_count_by_thumb = {}
+
+        for play_data in light_play_datas:
+            play_count_text = play_data.get("play_count_text")
+            play_count_value = parse_tiktok_number(play_count_text)
+
+            video_id = play_data.get("video_id")
+            if video_id:
+                play_count_by_id[video_id] = {
+                    "play_count_text": play_count_text,
+                    "play_count": play_count_value
+                }
+
+            thumbnail_url = play_data.get("video_thumbnail_url")
+            if thumbnail_url:
+                thumb_key = extract_thumbnail_essence(thumbnail_url)
+                play_count_by_thumb[thumb_key] = {
+                    "play_count_text": play_count_text,
+                    "play_count": play_count_value
+                }
+
+        merged = []
+        for like_data in light_like_datas:
+            merged_data = dict(like_data)
+            video_id = like_data.get("video_id")
+            thumb_key = extract_thumbnail_essence(like_data.get("video_thumbnail_url", ""))
+
+            if video_id in play_count_by_id:
+                merged_data.update(play_count_by_id[video_id])
+            elif thumb_key in play_count_by_thumb:
+                merged_data.update(play_count_by_thumb[thumb_key])
+
+            merged.append(merged_data)
+
+        return merged
+
     # ユーザーの動画データをクロールする
     # Condition: 自由
     # Args:
@@ -1392,7 +1439,12 @@ class TikTokCrawler:
             return False # ユーザー単位でしか問題にならないエラーなのでここで処置完了としてよい
         except Exception:
             raise
-        light_like_datas = self.get_video_light_like_datas_from_user_page(max_videos_per_user)
+
+        light_like_datas: List[Dict] = []
+        light_play_datas: List[Dict] = []
+
+        if light_or_heavy != "both":
+            light_like_datas = self.get_video_light_like_datas_from_user_page(max_videos_per_user)
 
         if light_or_heavy == "light":
             logger.info(f"ユーザー @{user.favorite_user_username} の軽いデータのクロールを開始")
@@ -1408,29 +1460,17 @@ class TikTokCrawler:
 
         
         if light_or_heavy == "heavy":
-            
+
             logger.info(f"ユーザー @{user.favorite_user_username} の重いデータのクロールを開始")
+            light_like_datas = self.get_video_light_like_datas_from_user_page(max_videos_per_user)
+            light_play_datas = self.get_video_play_count_datas_from_user_page(max_videos_per_user)
             if not recrawl:
                 existing_video_ids = self.video_repo.get_existing_heavy_data_video_ids(user.favorite_user_username)
                 light_like_datas = [light_like_data for light_like_data in light_like_datas if light_like_data["video_id"] not in existing_video_ids]
 
             # ここで最新20件に限定
             light_like_datas = light_like_datas[:20]  # 追加
-                # 再生数データをマッピング
-            play_count_map = {}
-            for play_data in light_play_datas:
-                thumbnail_essence = extract_thumbnail_essence(play_data["video_thumbnail_url"])
-                play_count_text = play_data["play_count_text"]
-                play_count_map[thumbnail_essence] = {
-                    "play_count_text": play_count_text,
-                    "play_count": parse_tiktok_number(play_count_text)
-                }
-    
-            # light_like_datasに再生数を追加
-            for light_like_data in light_like_datas:
-                thumbnail_essence = extract_thumbnail_essence(light_like_data["video_thumbnail_url"])
-                if thumbnail_essence in play_count_map:
-                    light_like_data.update(play_count_map[thumbnail_essence])
+            light_like_datas = self.attach_play_counts(light_like_datas, light_play_datas)
 
             logger.info(f"動画 {len(light_like_datas)}件に対し重いデータのクロールを行います")
             for light_like_data in light_like_datas:
@@ -1460,48 +1500,26 @@ class TikTokCrawler:
         )
 
         if light_or_heavy == "both":
+            # 先にフォロワー数とニックネームを取得して保存
+            self.fetch_and_save_followers(user)
+            current_nickname = self.get_and_save_user_name_datas(user.favorite_user_username)
+
+            # フォロワー取得のあとに動画の基本データと再生数を取得
+            light_like_datas = self.get_video_light_like_datas_from_user_page(max_videos_per_user)
+
+            # 軽いデータと再生数を保存
+            self.parse_and_save_video_light_datas(light_like_datas)
+
             if user.is_new_account == True:
                 logger.info(f"ユーザー @{user.favorite_user_username} の軽いデータののクロールを開始")
                 max_videos_per_batch = 100  # 1回のバッチで取得する動画数
-                # target_date = datetime(2025, 1, 1)  # この日付より前の動画が見つかるまでクロール
                 processed_urls = set()  # 処理済みのURLを記録
 
                 while True:
-                    # 最新の動画URLを取得してビデオページに移動
-                    # first_url = self.get_latest_video_url_from_user_page()
-                    # self.navigate_to_video_page(first_url)
-                    # self.navigate_to_video_page_creator_videos_tab()
-                    
-                    # # 軽いデータを取得
-                    # light_play_datas = self.get_video_light_play_datas_from_video_page_creator_videos_tab(max_videos_per_batch + 10)
-                    self.parse_and_save_video_light_datas(light_like_datas)
-                    # self.navigate_to_user_page_from_video_page()
-                    
-                    logger.info(f"バッチの軽いデータのクロールを完了しました。ユーザー名のクロールを開始します。")
-                    current_nickname = self.get_and_save_user_name_datas(user.favorite_user_username)
-
-                    
-
-                    # play_count_map = {}
-                    # for play_data in light_play_datas:
-                    #     thumbnail_essence = extract_thumbnail_essence(play_data["video_thumbnail_url"])
-                    #     play_count_text = play_data["play_count_text"]
-                    #     play_count_map[thumbnail_essence] = {
-                    #         "play_count_text": play_count_text,
-                    #         "play_count": parse_tiktok_number(play_count_text)
-                    #     }
-            
-                    # # light_like_datasに再生数を追加
-                    # for light_like_data in light_like_datas:
-                    #     thumbnail_essence = extract_thumbnail_essence(light_like_data["video_thumbnail_url"])
-                    #     if thumbnail_essence in play_count_map:
-                    #         light_like_data.update(play_count_map[thumbnail_essence])
-                            # 重いデータを取得
-                    # last_post_time = None
-                    light_like_datas.sort(key=lambda d: int(d["video_id"]), reverse=True)
+                    light_like_datas.sort(key=lambda d: int(d["video_id"]), reverse=True)  # merged → light_like
 
                     # ③ 先頭 max_videos_per_batch 件だけをバッチ対象にスライス
-                    batch_datas = light_like_datas[:max_videos_per_batch]
+                    batch_datas = light_like_datas[:max_videos_per_batch]  # merged → light_like
                     for light_like_data in batch_datas:
                         if light_like_data["video_url"] in processed_urls:
                             continue
@@ -1520,9 +1538,9 @@ class TikTokCrawler:
                             # post_time = parse_tiktok_time(heavy_data.get("post_time_text"), datetime.now())
                             # if post_time:
                             #     last_post_time = post_time
-                            
+
                             processed_urls.add(light_like_data["video_url"])
-                            self._random_sleep(5.0, 15.0)
+                            self._random_sleep(10.0, 20.0)
                                     
                                 
                         except KeyboardInterrupt:
@@ -1562,25 +1580,13 @@ class TikTokCrawler:
 
 
                     # ②既に処理済みのURLを除外
-                    light_like_datas = [data for data in light_like_datas if data["video_url"] not in processed_urls]
-                    if not light_like_datas:
+                    light_like_datas = [data for data in light_like_datas if data["video_url"] not in processed_urls]  # merged → light_like
+                    if not light_like_datas:  # merged → light_like
                         logger.info("未処理の動画が残っていないため、クロールを終了します")
                         break
 
             else:
                 # 取得実績有アカウントの処理
-
-                # 最新の動画URLを取得してビデオページに移動
-                # first_url = self.get_latest_video_url_from_user_page()
-                # self.navigate_to_video_page(first_url)
-                # self.navigate_to_video_page_creator_videos_tab()
-                # max_videos_per_batch = 50
-                # 軽いデータを取得
-                # light_play_datas = self.get_video_light_play_datas_from_video_page_creator_videos_tab(max_videos_per_batch + 10)
-                self.parse_and_save_video_light_datas(light_like_datas)
-                # self.navigate_to_user_page_from_video_page()
-                    
-                # logger.info(f"バッチの軽いデータのクロールを完了しました。重いデータのクロールを開始します。")
                 # needs_update=1の動画を取得
                 logger.info(f"ユーザー @{user.favorite_user_username} の更新が必要な動画を取得します")
                 videos_needing_update = self.video_repo.get_videos_needing_update(user.favorite_user_username)
@@ -1593,10 +1599,10 @@ class TikTokCrawler:
                         direct_access = self.navigate_to_video_page(video["video_url"])
                         if direct_access:
                             heavy_data = self.get_video_heavy_data_from_direct_access(fetch_comments=fetch_comments)
-                        else:                            
+                        else:
                             heavy_data = self.get_video_heavy_data_from_video_page(fetch_comments=fetch_comments)
-                        self.parse_and_save_video_heavy_data(heavy_data, video["video_thumbnail_url"],video.get("video_alt_info_text"),user.favorite_user_username,user.nickname)
-                        self._random_sleep(5.0, 15.0)
+                        self.parse_and_save_video_heavy_data(heavy_data, video["video_thumbnail_url"],video.get("video_alt_info_text"),user.favorite_user_username,current_nickname)
+                        self._random_sleep(10.0, 20.0)
                     except KeyboardInterrupt:
                         raise
                     except Exception:
@@ -1658,6 +1664,27 @@ class TikTokCrawler:
                     continue
         
         logger.info(f"クロール対象のお気に入りユーザー{len(favorite_users)}件に対し{light_or_heavy}データのクロールを完了しました")
+
+    def fetch_and_save_followers(self, user: FavoriteUser) -> Tuple[Optional[str], Optional[int]]:
+        logger.debug("フォロワー数を取得して保存中...")
+        followers_count_text, followers_count = self.get_user_followers_count_from_user_page()
+        collection_date = (datetime.now() - timedelta(days=1)).date()
+
+        if followers_count_text is not None or followers_count is not None:
+            try:
+                self.favorite_user_repo.upsert_account_follower_history(
+                    account_id=user.id,
+                    collection_date=collection_date,
+                    follower_text=followers_count_text,
+                    follower_count=followers_count
+                )
+                logger.info(f"フォロワー数を保存しました: account_id={user.id}, date={collection_date}, followers={followers_count_text} ({followers_count})")
+            except Exception:
+                logger.exception("フォロワー数の保存に失敗しました")
+        else:
+            logger.warning("フォロワー数が取得できなかったため保存をスキップします")
+
+        return followers_count_text, followers_count
 
     def crawl_play_count(self, user: FavoriteUser, max_videos_per_user: int = 100):
         logger.info(f"ユーザー @{user.favorite_user_username} の軽いデータのクロールを開始")

@@ -1,0 +1,4 @@
+2025-12-08 19:56:48,188 - src.crawler.selenium_manager - INFO - CAPTCHA Solver付きのドライバーを作成します
+2025-12-08 19:56:48,307 - src.crawler.selenium_manager - INFO - Chromeドライバーの設定が完了しました
+2025-12-08 19:56:50,624 - src.crawler.selenium_manager - INFO - Chromeドライバーを終了しました
+2025-12-08 19:56:50,841 - __main__ - INFO - ユーザーによって中断されました

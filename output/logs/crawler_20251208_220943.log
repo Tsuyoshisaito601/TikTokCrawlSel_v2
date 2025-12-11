@@ -1,0 +1,22 @@
+2025-12-08 22:09:50,194 - src.crawler.selenium_manager - INFO - CAPTCHA Solver付きのドライバーを作成します
+2025-12-08 22:09:50,260 - src.crawler.selenium_manager - INFO - Chromeドライバーの設定が完了しました
+2025-12-08 22:09:50,261 - __main__ - INFO - クローラーアカウント nana_ito@pivotx.jp でInstagramにログインします...
+2025-12-08 22:09:50,261 - __main__ - INFO - 事前構成済みのChromeプロファイルでログイン状態を確認します
+2025-12-08 22:09:59,582 - __main__ - INFO - 既存プロフィールでログイン済みでした
+2025-12-08 22:09:59,639 - __main__ - INFO - 1件の推しユーザーに対してライトデータをクロールします
+2025-12-08 22:09:59,672 - src.crawler.selenium_manager - INFO - Chromeドライバーを終了しました
+2025-12-08 22:09:59,675 - __main__ - ERROR - 予期しないエラーが発生しました
+Traceback (most recent call last):
+  File "D:\app_ssd\Buzzmiru\Crawlsel2\TikTokCrawlSel_v2\src\crawler\insta_crawler.py", line 844, in <module>
+    main()
+  File "D:\app_ssd\Buzzmiru\Crawlsel2\TikTokCrawlSel_v2\src\crawler\insta_crawler.py", line 834, in main
+    crawler.crawl_favorite_users(
+  File "D:\app_ssd\Buzzmiru\Crawlsel2\TikTokCrawlSel_v2\src\crawler\insta_crawler.py", line 723, in crawl_favorite_users
+    favorite_users = self.favorite_user_repo.get_favorite_users(
+  File "D:\app_ssd\Buzzmiru\Crawlsel2\TikTokCrawlSel_v2\src\database\repositories.py", line 517, in get_favorite_users
+    return [self._row_to_favorite_user(row) for row in rows]
+  File "D:\app_ssd\Buzzmiru\Crawlsel2\TikTokCrawlSel_v2\src\database\repositories.py", line 517, in <listcomp>
+    return [self._row_to_favorite_user(row) for row in rows]
+  File "D:\app_ssd\Buzzmiru\Crawlsel2\TikTokCrawlSel_v2\src\database\repositories.py", line 494, in _row_to_favorite_user
+    account_type=row[10],
+IndexError: tuple index out of range

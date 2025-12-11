@@ -1,0 +1,84 @@
+2025-12-08 14:40:59,412 - src.crawler.selenium_manager - ERROR - Chromeドライバーの設定中にエラーが発生しました: Message: session not created: cannot connect to chrome at 127.0.0.1:53661
+from session not created: This version of ChromeDriver only supports Chrome version 143
+Current browser version is 142.0.7444.176
+Stacktrace:
+Symbols not available. Dumping unresolved backtrace:
+	0x5d0d23
+	0x5d0d64
+	0x3be6dd
+	0x3fa958
+	0x3f9992
+	0x3efbe5
+	0x3efa16
+	0x437826
+	0x437047
+	0x42b2e6
+	0x3fd321
+	0x3fe1d4
+	0x824d64
+	0x82031b
+	0x83cbfa
+	0x5eac28
+	0x5f2c2d
+	0x5d9028
+	0x5d91e9
+	0x5c3578
+	0x75935d49
+	0x76fcd6cb
+	0x76fcd651
+
+2025-12-08 14:40:59,992 - __main__ - ERROR - 予期しないエラーが発生しました
+Traceback (most recent call last):
+  File "D:\app_ssd\Buzzmiru\Crawlsel2\TikTokCrawlSel_v2\src\crawler\insta_crawler.py", line 820, in <module>
+    main()
+  File "D:\app_ssd\Buzzmiru\Crawlsel2\TikTokCrawlSel_v2\src\crawler\insta_crawler.py", line 799, in main
+    with InstaCrawler(
+  File "D:\app_ssd\Buzzmiru\Crawlsel2\TikTokCrawlSel_v2\src\crawler\insta_crawler.py", line 200, in __enter__
+    self.driver = self.selenium_manager.setup_driver()
+  File "D:\app_ssd\Buzzmiru\Crawlsel2\TikTokCrawlSel_v2\src\crawler\selenium_manager.py", line 91, in setup_driver
+    self.driver = uc.Chrome(options=options)
+  File "D:\app_ssd\Buzzmiru\Crawlsel2\TikTokCrawlSel_v2\venv\lib\site-packages\undetected_chromedriver\__init__.py", line 466, in __init__
+    super(Chrome, self).__init__(
+  File "D:\app_ssd\Buzzmiru\Crawlsel2\TikTokCrawlSel_v2\venv\lib\site-packages\selenium\webdriver\chrome\webdriver.py", line 45, in __init__
+    super().__init__(
+  File "D:\app_ssd\Buzzmiru\Crawlsel2\TikTokCrawlSel_v2\venv\lib\site-packages\selenium\webdriver\chromium\webdriver.py", line 61, in __init__
+    super().__init__(command_executor=executor, options=options)
+  File "D:\app_ssd\Buzzmiru\Crawlsel2\TikTokCrawlSel_v2\venv\lib\site-packages\selenium\webdriver\remote\webdriver.py", line 208, in __init__
+    self.start_session(capabilities)
+  File "D:\app_ssd\Buzzmiru\Crawlsel2\TikTokCrawlSel_v2\venv\lib\site-packages\undetected_chromedriver\__init__.py", line 724, in start_session
+    super(selenium.webdriver.chrome.webdriver.WebDriver, self).start_session(
+  File "D:\app_ssd\Buzzmiru\Crawlsel2\TikTokCrawlSel_v2\venv\lib\site-packages\selenium\webdriver\remote\webdriver.py", line 292, in start_session
+    response = self.execute(Command.NEW_SESSION, caps)["value"]
+  File "D:\app_ssd\Buzzmiru\Crawlsel2\TikTokCrawlSel_v2\venv\lib\site-packages\selenium\webdriver\remote\webdriver.py", line 347, in execute
+    self.error_handler.check_response(response)
+  File "D:\app_ssd\Buzzmiru\Crawlsel2\TikTokCrawlSel_v2\venv\lib\site-packages\selenium\webdriver\remote\errorhandler.py", line 229, in check_response
+    raise exception_class(message, screen, stacktrace)
+selenium.common.exceptions.SessionNotCreatedException: Message: session not created: cannot connect to chrome at 127.0.0.1:53661
+from session not created: This version of ChromeDriver only supports Chrome version 143
+Current browser version is 142.0.7444.176
+Stacktrace:
+Symbols not available. Dumping unresolved backtrace:
+	0x5d0d23
+	0x5d0d64
+	0x3be6dd
+	0x3fa958
+	0x3f9992
+	0x3efbe5
+	0x3efa16
+	0x437826
+	0x437047
+	0x42b2e6
+	0x3fd321
+	0x3fe1d4
+	0x824d64
+	0x82031b
+	0x83cbfa
+	0x5eac28
+	0x5f2c2d
+	0x5d9028
+	0x5d91e9
+	0x5c3578
+	0x75935d49
+	0x76fcd6cb
+	0x76fcd651
+
