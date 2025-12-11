@@ -40,6 +40,74 @@ class CrawlerAccountRepository:
             last_crawled_at=row[5]
         )
 
+    def get_crawler_account_by_id(self, crawler_account_id: int) -> Optional[CrawlerAccount]:
+        """指定IDのクローラーアカウントを取得"""
+        query = """
+            SELECT id, username, password, proxy, is_alive, last_crawled_at
+            FROM crawler_accounts
+            WHERE id = %s
+            AND is_alive = TRUE
+            LIMIT 1
+        """
+        cursor = self.db.execute_query(query, (crawler_account_id,))
+        row = cursor.fetchone()
+        cursor.close()
+
+        if not row:
+            return None
+
+        return CrawlerAccount(
+            id=row[0],
+            username=row[1],
+            password=row[2],
+            proxy=row[3],
+            is_alive=row[4],
+            last_crawled_at=row[5]
+        )
+
+    def get_play_count_crawler_account(self, play_count_crawler_id: int) -> Optional[CrawlerAccount]:
+        """指定されたplay_count_crawler_idを持つクローラーアカウントを取得する"""
+        query = """
+            SELECT id, username, password, proxy, is_alive, last_crawled_at
+            FROM play_count_crawler_accounts
+            WHERE id = %s
+            AND is_alive = TRUE
+            LIMIT 1
+        """
+        cursor = self.db.execute_query(query, (play_count_crawler_id,))
+        row = cursor.fetchone()
+        cursor.close()
+
+        if not row:
+            return None
+
+        return CrawlerAccount(
+            id=row[0],
+            username=row[1],
+            password=row[2],
+            proxy=row[3],
+            is_alive=row[4],
+            last_crawled_at=row[5]
+        )
+
+    def update_crawler_account_last_crawled(self, crawler_account_id: int, last_crawled_at: datetime):
+        """crawler_accountsの最終クロール時間を更新"""
+        query = """
+            UPDATE crawler_accounts
+            SET last_crawled_at = %s
+            WHERE id = %s
+        """
+        self.db.execute_query(query, (last_crawled_at, crawler_account_id))
+
+    def update_play_count_crawler_account_last_crawled(self, crawler_account_id: int, last_crawled_at: datetime):
+        """play_count_crawler_accountsの最終クロール時間を更新"""
+        query = """
+            UPDATE play_count_crawler_accounts
+            SET last_crawled_at = %s
+            WHERE id = %s
+        """
+        self.db.execute_query(query, (last_crawled_at, crawler_account_id))
+
 
 class InstaCrawlerAccountRepository:
     """Instagram専用クローラアカウント用リポジトリ（insta_crawler_accounts）"""
@@ -107,81 +175,6 @@ class InstaCrawlerAccountRepository:
             WHERE id = %s
         """
         self.db.execute_query(query, (last_crawled_at, crawler_account_id))
-
-    def update_crawler_account_last_crawled(self, crawler_account_id: int, last_crawled_at: datetime):
-        """クローラーアカウントの最終クロール時間を更新"""
-        query = """
-            UPDATE crawler_accounts
-            SET last_crawled_at = %s
-            WHERE id = %s
-        """
-        self.db.execute_query(query, (last_crawled_at, crawler_account_id))
-
-    def update_play_count_crawler_account_last_crawled(self, crawler_account_id: int, last_crawled_at: datetime):
-        """再生数クローラーアカウントの最終クロール時間を更新"""
-        query = """
-            UPDATE play_count_crawler_accounts
-            SET last_crawled_at = %s
-            WHERE id = %s
-        """
-        self.db.execute_query(query, (last_crawled_at, crawler_account_id))
-
-    def get_crawler_account_by_id(self, crawler_account_id: int) -> Optional[CrawlerAccount]:
-        """指定されたIDのクローラーアカウントを取得する
-        
-        Args:
-            crawler_account_id: 取得するクローラーアカウントのID
-        
-        Returns:
-            CrawlerAccountオブジェクト。見つからない場合はNone。
-        """
-        query = """
-            SELECT id, username, password, proxy, is_alive, last_crawled_at
-            FROM crawler_accounts
-            WHERE id = %s
-            AND is_alive = TRUE
-            LIMIT 1
-        """
-        cursor = self.db.execute_query(query, (crawler_account_id,))
-        row = cursor.fetchone()
-        cursor.close()
-
-        if not row:
-            return None
-
-        return CrawlerAccount(
-            id=row[0],
-            username=row[1],
-            password=row[2],
-            proxy=row[3],
-            is_alive=row[4],
-            last_crawled_at=row[5]
-        )
-
-    def get_play_count_crawler_account(self, play_count_crawler_id: int) -> Optional[CrawlerAccount]:
-        """指定されたplay_count_crawler_idを持つクローラーアカウントを取得する"""
-        query = """
-            SELECT id, username, password, proxy, is_alive, last_crawled_at
-            FROM play_count_crawler_accounts
-            WHERE id = %s
-            AND is_alive = TRUE
-            LIMIT 1
-        """
-        cursor = self.db.execute_query(query, (play_count_crawler_id,))
-        row = cursor.fetchone()
-        cursor.close()
-
-        if not row:
-            return None
-
-        return CrawlerAccount(
-            id=row[0],
-            username=row[1],
-            password=row[2],
-            proxy=row[3],
-            is_alive=row[4],
-            last_crawled_at=row[5]
-        )
 
 class FavoriteUserRepository:
     def __init__(self, db: Database):

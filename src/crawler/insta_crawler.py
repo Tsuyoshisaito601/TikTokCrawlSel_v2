@@ -163,6 +163,7 @@ class InstaCrawler:
         chrome_user_data_dir: Optional[str] = None,
         chrome_profile_directory: Optional[str] = None,
         skip_login: bool = False,
+        use_proxy: bool = True,
     ):
         self.crawler_account_repo = crawler_account_repo
         self.favorite_user_repo = favorite_user_repo
@@ -180,6 +181,7 @@ class InstaCrawler:
         self.chrome_user_data_dir = chrome_user_data_dir
         self.chrome_profile_directory = chrome_profile_directory
         self.skip_login = skip_login
+        self.use_proxy = use_proxy
 
         self.publisher: Optional[pubsub_v1.PublisherClient] = None
         self._publisher_topic_path: Optional[str] = None
@@ -199,7 +201,7 @@ class InstaCrawler:
                     self.crawler_account = self.crawler_account_repo.get_an_available_crawler_account()
                     if not self.crawler_account:
                         raise Exception("利用可能なクローラーアカウントが存在しません")
-                proxy = self.crawler_account.proxy
+                proxy = self.crawler_account.proxy if self.use_proxy else None
             else:
                 proxy = None
 
@@ -953,6 +955,11 @@ def main():
         default="light",
         help="light: クロール実行, test: ログインのみで停止",
     )
+    parser.add_argument(
+        "--no-proxy",
+        action="store_true",
+        help="プロキシを使わず直接接続する",
+    )
     args = parser.parse_args()
 
     if args.use_profile and not args.chrome_user_data_dir:
@@ -978,6 +985,7 @@ def main():
                 chrome_user_data_dir=args.chrome_user_data_dir,
                 chrome_profile_directory=args.chrome_profile_directory,
                 skip_login=True,
+                use_proxy=not args.no_proxy,
             )
             try:
                 crawler.__enter__()
@@ -996,6 +1004,7 @@ def main():
                 use_profile=args.use_profile,
                 chrome_user_data_dir=args.chrome_user_data_dir,
                 chrome_profile_directory=args.chrome_profile_directory,
+                use_proxy=not args.no_proxy,
             ) as crawler:
                 crawler.crawl_favorite_users(
                     max_videos_per_user=args.max_videos_per_user,
