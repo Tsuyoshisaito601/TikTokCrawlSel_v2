@@ -568,9 +568,9 @@ class TikTokCrawler:
                 thumbnail_url = thumbnail_element.get_attribute("src")
                 video_alt_info_text = thumbnail_element.get_attribute("alt")
                 
-                # 再生数を取得（表示形式のまま）
-                play_count_element = video_element.find_element(By.CSS_SELECTOR, "[data-e2e='video-views']")
-                play_count_text = play_count_element.text
+                # いいね数を取得（表示形式のまま）
+                like_count_element = video_element.find_element(By.CSS_SELECTOR, "[data-e2e='video-views']")
+                like_count_text = like_count_element.text
                 
                 video_stats.append({
                     "video_url": video_url,
@@ -578,7 +578,7 @@ class TikTokCrawler:
                     "user_username": user_username,
                     "video_thumbnail_url": thumbnail_url,
                     "video_alt_info_text": video_alt_info_text,
-                    "play_count_text": play_count_text,  # like_count_text → play_count_text
+                    "like_count_text": like_count_text,  # play_count_text → like_count_text
                     "crawling_algorithm": "selenium-human-like-1"
                 })
             
@@ -1331,22 +1331,22 @@ class TikTokCrawler:
                 user_username=like_data["user_username"],
                 video_thumbnail_url=like_data["video_thumbnail_url"],
                 video_alt_info_text=like_data["video_alt_info_text"],
-                play_count_text=like_data["play_count_text"],
-                play_count=parse_tiktok_number(like_data["play_count_text"]),
+                like_count_text=like_data["like_count_text"],  # play_count_text → like_count_text
+                like_count=parse_tiktok_number(like_data["like_count_text"]),  # play_count → like_count
                 crawling_algorithm=like_data["crawling_algorithm"],
                 crawled_at=datetime.now()
             )
 
             self.video_repo.save_video_light_data(data)
             
-            # Pub/Sub送信
-            message_data = {
-                "video_id": like_data["video_id"],
-                "video_url": like_data["video_url"],
-                "user_username": like_data["user_username"],
-                "play_count": parse_tiktok_number(like_data["play_count_text"])
-            }
-            self._publish_video_master_sync(message_data)
+            # Pub/Sub送信を削除（以下の部分を削除）
+            # message_data = {
+            #     "video_id": like_data["video_id"],
+            #     "video_url": like_data["video_url"],
+            #     "user_username": like_data["user_username"],
+            #     "play_count": parse_tiktok_number(like_data["play_count_text"])
+            # }
+            # self._publish_video_master_sync(message_data)
             
         logger.info(f"動画の軽いデータをパースおよび保存しました: {len(light_like_datas)}件")
 
@@ -1500,14 +1500,13 @@ class TikTokCrawler:
         )
 
         if light_or_heavy == "both":
-            # 先にフォロワー数とニックネームを取得して保存
-            self.fetch_and_save_followers(user)
+            # ニックネームを取得して保存
             current_nickname = self.get_and_save_user_name_datas(user.favorite_user_username)
 
-            # フォロワー取得のあとに動画の基本データと再生数を取得
+            # 動画の基本データといいね数を取得
             light_like_datas = self.get_video_light_like_datas_from_user_page(max_videos_per_user)
 
-            # 軽いデータと再生数を保存
+            # 軽いデータといいね数を保存
             self.parse_and_save_video_light_datas(light_like_datas)
 
             if user.is_new_account == True:
