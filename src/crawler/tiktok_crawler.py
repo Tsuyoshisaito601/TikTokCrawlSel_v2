@@ -768,7 +768,12 @@ class TikTokCrawler:
                     post_time_element = self.driver.find_element(By.CSS_SELECTOR, "[data-e2e='browser-nickname'] span:last-child")
                     post_time_text = post_time_element.text
                 except NoSuchElementException:
-                    post_time_text = ""
+                    try:
+                        # 新UI対応：DivCreatorInfoContainer内の直接の子span（投稿日）
+                        post_time_element = self.driver.find_element(By.CSS_SELECTOR, "div[class*='DivCreatorInfoContainer'] > span")
+                        post_time_text = post_time_element.text
+                    except NoSuchElementException:
+                        post_time_text = ""
         # audio_url = self.driver.find_element(By.CSS_SELECTOR, "[data-e2e='browse-music'] a,[data-e2e='video-music']").get_attribute("href")
         try:
             # まず新しい形式を試す
@@ -839,16 +844,29 @@ class TikTokCrawler:
             post_time_text = post_time_element.text
         except NoSuchElementException:
             try:
-                # フォールバック：ユーザーリンク限定
-                post_time_element = self.driver.find_element(By.CSS_SELECTOR, "a[href^='/@'][class*='StyledLink'] span:last-child")
+                # 新UI対応：DivCreatorInfoContainer内の直接の子span（投稿日）
+                post_time_element = self.driver.find_element(By.CSS_SELECTOR, "div[class*='DivCreatorInfoContainer'] > span")
                 post_time_text = post_time_element.text
             except NoSuchElementException:
                 try:
-                    # 古い形式
-                    post_time_element = self.driver.find_element(By.CSS_SELECTOR, "[data-e2e='browser-nickname'] span:last-child")
+                    # フォールバック：ユーザーリンク限定
+                    post_time_element = self.driver.find_element(By.CSS_SELECTOR, "a[href^='/@'][class*='StyledLink'] span:last-child")
                     post_time_text = post_time_element.text
                 except NoSuchElementException:
-                    post_time_text = ""
+                    try:
+                        # 古い形式
+                        post_time_element = self.driver.find_element(By.CSS_SELECTOR, "[data-e2e='browser-nickname'] span:last-child")
+                        post_time_text = post_time_element.text
+                    except NoSuchElementException:
+                        post_time_text = ""
+        
+        # 中黒区切りの処理（" · 6日前" → "6日前"）
+        if " · " in post_time_text:
+            post_time_text = post_time_text.split(" · ")[-1]
+        elif "· " in post_time_text:
+            post_time_text = post_time_text.split("· ")[-1]
+        elif "·" in post_time_text:
+            post_time_text = post_time_text.split("·")[-1].strip()
         
         # 音楽情報の取得（複数のセレクターに対応）
         try:
