@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import date, datetime
 from typing import Optional
 
 @dataclass
@@ -81,3 +81,28 @@ class VideoPlayCountRawData:
     play_count: Optional[int] = None
     crawling_algorithm: str = ""
     crawled_at: datetime = datetime.now()
+
+@dataclass
+class InstaLightRawData:
+    id: Optional[int] = None  # 自動採番
+    video_url: str = ""
+    video_id: str = ""  # InstagramリールのIDそのまま
+    user_username: str = ""  # 動画を投稿したアカウントのユーザー名
+    video_thumbnail_url: str = ""
+    play_count_text: Optional[str] = None
+    play_count: Optional[int] = None
+    crawling_algorithm: str = ""
+    crawled_at: datetime = datetime.now()
+
+@dataclass
+class InstaHeavyRawData:
+    id: Optional[int] = None  # 自動採番
+    video_url: str = ""
+    video_id: str = ""  # InstagramリールのIDそのまま
+    video_title: str = ""
+    post_time_text: str = ""
+    post_time: Optional[date] = None
+    crawling_algorithm: str = ""
+    crawled_at: datetime = datetime.now()
+    comments_json: Optional[str] = None
+    audio_title: Optional[str] = None
