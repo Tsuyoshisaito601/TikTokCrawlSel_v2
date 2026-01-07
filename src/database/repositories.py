@@ -1,7 +1,15 @@
 from datetime import datetime
 from typing import List, Optional, Set, Dict, Tuple
 from .database import Database
-from .models import CrawlerAccount, FavoriteUser, VideoHeavyRawData, VideoLightRawData, VideoPlayCountRawData
+from .models import (
+    CrawlerAccount,
+    FavoriteUser,
+    InstaHeavyRawData,
+    InstaLightRawData,
+    VideoHeavyRawData,
+    VideoLightRawData,
+    VideoPlayCountRawData,
+)
 from ..logger import setup_logger
 
 logger = setup_logger(__name__)
@@ -495,6 +503,7 @@ class InstaFavoriteUserRepository:
             FROM insta_account_list
             WHERE crawler_account_id = %s
               AND favorite_user_is_alive = TRUE
+              AND (has_reels IS NULL OR has_reels = TRUE)
             ORDER BY
                 CASE
                     WHEN last_crawled_at IS NULL THEN 1
@@ -537,6 +546,15 @@ class InstaFavoriteUserRepository:
         """
         self.db.execute_query(query, (is_alive, username))
 
+    def update_favorite_user_has_reels(self, username: str, has_reels: bool):
+        """推しアカウントのリール有無フラグを更新"""
+        query = """
+            UPDATE insta_account_list
+            SET has_reels = %s
+            WHERE favorite_user_username = %s
+        """
+        self.db.execute_query(query, (has_reels, username))
+
     def upsert_account_follower_history(
         self, account_id, collection_date, follower_text, follower_count
     ):
@@ -560,21 +578,20 @@ class InstaVideoRepository:
     def __init__(self, db: Database):
         self.db = db
 
-    def save_insta_light_data(self, data: VideoLightRawData):
+    def save_insta_light_data(self, data: InstaLightRawData):
         query = """
             INSERT INTO insta_light_raw_data (
                 video_url, video_id, user_username,
-                video_thumbnail_url, video_alt_info_text,
+                video_thumbnail_url,
                 play_count_text, play_count,
                 crawling_algorithm, crawled_at
             ) VALUES (
-                %s, %s, %s, %s, %s, %s, %s, %s, %s
+                %s, %s, %s, %s, %s, %s, %s, %s
             ) ON DUPLICATE KEY UPDATE
                 video_url = VALUES(video_url),
                 video_id = VALUES(video_id),
                 user_username = VALUES(user_username),
                 video_thumbnail_url = VALUES(video_thumbnail_url),
-                video_alt_info_text = VALUES(video_alt_info_text),
                 play_count_text = VALUES(play_count_text),
                 play_count = VALUES(play_count),
                 crawling_algorithm = VALUES(crawling_algorithm),
@@ -587,7 +604,6 @@ class InstaVideoRepository:
                 data.video_id,
                 data.user_username,
                 data.video_thumbnail_url,
-                data.video_alt_info_text,
                 data.play_count_text,
                 data.play_count,
                 data.crawling_algorithm,
@@ -595,49 +611,38 @@ class InstaVideoRepository:
             ),
         )
 
-    def save_insta_heavy_data(self, data: VideoLightRawData):
+    def save_insta_heavy_data(self, data: InstaHeavyRawData):
         """リール動画ページから取得した詳細データを保存"""
         query = """
             INSERT INTO insta_heavy_raw_data (
-                video_url, video_id, user_username,
-                video_thumbnail_url, video_title,
-                play_count_text, play_count,
-                crawling_algorithm, crawled_at,
+                video_url, video_id, video_title,
                 post_time_text, post_time,
-                comments_json, audio_title
+                comments_json, audio_title,
+                crawling_algorithm, crawled_at
             ) VALUES (
-                %s, %s, %s, %s, %s, %s, %s, %s, %s,
-                %s, %s, %s, %s
+                %s, %s, %s, %s, %s, %s, %s, %s, %s
             ) ON DUPLICATE KEY UPDATE
                 video_url = VALUES(video_url),
                 video_id = VALUES(video_id),
-                user_username = VALUES(user_username),
-                video_thumbnail_url = VALUES(video_thumbnail_url),
                 video_title = VALUES(video_title),
-                play_count_text = VALUES(play_count_text),
-                play_count = VALUES(play_count),
-                crawling_algorithm = VALUES(crawling_algorithm),
-                crawled_at = VALUES(crawled_at),
                 post_time_text = VALUES(post_time_text),
                 post_time = VALUES(post_time),
                 comments_json = VALUES(comments_json),
-                audio_title = VALUES(audio_title)
+                audio_title = VALUES(audio_title),
+                crawling_algorithm = VALUES(crawling_algorithm),
+                crawled_at = VALUES(crawled_at)
         """
         self.db.execute_query(
             query,
             (
                 data.video_url,
                 data.video_id,
-                data.user_username,
-                data.video_thumbnail_url,
-                data.video_alt_info_text,  # video title
-                data.play_count_text,
-                data.play_count,
-                data.crawling_algorithm,
-                data.crawled_at,
+                data.video_title,
                 data.post_time_text,
                 data.post_time,
                 data.comments_json,
                 data.audio_title,
+                data.crawling_algorithm,
+                data.crawled_at,
             ),
         )

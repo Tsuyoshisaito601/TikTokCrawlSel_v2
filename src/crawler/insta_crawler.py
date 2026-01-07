@@ -3,7 +3,7 @@ import json
 import random
 import re
 import time
-from datetime import datetime, timedelta
+from datetime import date, datetime, timedelta
 from urllib.parse import urlparse
 from typing import Dict, List, Optional, Tuple
 
@@ -14,7 +14,7 @@ from selenium.webdriver.support.ui import WebDriverWait
 from selenium.common.exceptions import TimeoutException, NoSuchElementException
 
 from ..database.database import Database
-from ..database.models import CrawlerAccount, FavoriteUser, VideoLightRawData
+from ..database.models import CrawlerAccount, FavoriteUser, InstaHeavyRawData, InstaLightRawData
 from ..database.repositories import (
     InstaCrawlerAccountRepository,
     InstaFavoriteUserRepository,
@@ -118,18 +118,18 @@ class InstaCrawler:
         "div.x1lliihq.x1n2onr6.xh8yej3.x4gyw5p.x14z9mp.xhe4ym4.xaudc5v.x1j53mea"
     )
     REEL_ITEM_CONTAINER_SELECTOR = (
-        "div.x1qjc9v5.x972fbf.x10w94by.x1qhh985.x14e42zd.x9f619.x78zum5.xdt5ytf."
-        "x2lah0s.xln7xf2.xk390pu.xdj266r.xat24cr.x1lziwak.xexx8yu.xyri2b.x18d9i69."
-        "x1c1uobl.x1n2onr6.x11njtxf.xhe4ym4.x1mpyi22.x1j53mea"
+        "div.x1qjc9v5.x972fbf.x10w94by.x1qhh985.x14e42zd.x9f619.x78zum5.xdt5ytf"
     )
     REEL_VIEW_COUNT_SELECTOR = (
-        "span.xdj266r.x14z9mp.xat24cr.x1lziwak.xexx8yu.xyri2b.x18d9i69."
-        "x1c1uobl.x1hl2dhg.x16tdsg8.x1vvkbs"
+        "div._aaj_ span.html-span.xdj266r.x14z9mp.xat24cr.x1lziwak.xexx8yu."
+        "xyri2b.x18d9i69.x1c1uobl.x1hl2dhg.x16tdsg8.x1vvkbs"
     )
     REEL_THUMBNAIL_SELECTOR = "div.x1n2onr6.x1lvsgvq.xiy17q3.x18d0r48"
     PINNED_SVG_SELECTOR = "svg[title*='ピン留め']"
     VIDEO_POST_TIME_SELECTOR = "time.x1p4m5qa"
-    VIDEO_AUDIO_INFO_SELECTOR = "span.x6ikm8r.x10wlt62.xlyipyv.xuxw1ft"
+    VIDEO_AUDIO_INFO_SELECTOR = (
+        "a[href^='/reels/audio/'] span.x6ikm8r.x10wlt62.xlyipyv.xuxw1ft"
+    )
     VIDEO_TITLE_SELECTOR = (
         "h1._ap3a._aaco._aacu._aacx._aad7._aade, "
         "h1._ap3a, "
@@ -289,12 +289,13 @@ class InstaCrawler:
     def _random_sleep(self, min_seconds: float = 1.0, max_seconds: float = 3.0):
         time.sleep(random.uniform(min_seconds, max_seconds))
 
-    def _parse_datetime_attr(self, datetime_attr: Optional[str]) -> Optional[datetime]:
+    def _parse_datetime_attr(self, datetime_attr: Optional[str]) -> Optional[date]:
         if not datetime_attr:
             return None
         try:
             iso = datetime_attr.replace("Z", "+00:00")
-            return datetime.fromisoformat(iso)
+            parsed = datetime.fromisoformat(iso)
+            return parsed.date()
         except Exception:
             logger.warning(f"datetime属性のパースに失敗: {datetime_attr}", exc_info=True)
             return None
@@ -387,7 +388,7 @@ class InstaCrawler:
     def navigate_to_reels_page(self, username: str):
         reels_path = f"/{username}/reels/"
         reels_url = f"{self.BASE_URL}{reels_path}"
-        logger.debug(f"���[�U�[ @{username} �̃��[�����u�ւ�J�ڂ��܂�")
+        logger.debug(f"リールページ @{username} に遷移します")
         self._random_sleep(1.5, 2.5)
         try:
             reels_tab = WebDriverWait(self.driver, 10).until(
@@ -396,7 +397,7 @@ class InstaCrawler:
             reels_tab.click()
             self._random_sleep(1.5, 2.5)
         except TimeoutException:
-            logger.info("�u���[���̃^�u���ݒu�����ł���悤�Ȃ��̂ŁA����URL�ɃE�B���h�E���J�ڂ��܂�")
+            logger.info("リールタブが見つからないため、URLに直接遷移します")
             self.driver.get(reels_url)
 
         if not self.driver.current_url.rstrip("/").endswith(reels_path.rstrip("/")):
@@ -409,7 +410,7 @@ class InstaCrawler:
                 )
             )
         except TimeoutException:
-            logger.warning("���[�����u�̃R���e���c�[�̂�ǂ݂Ȃ����ߐ���")
+            logger.warning("リールタブのコンテンツが読み込めませんでした")
         self._random_sleep(1.5, 2.5)
 
     def scroll_user_page(self, need_items_count: int = 100, max_scroll_attempts: int = None) -> bool:
@@ -424,7 +425,7 @@ class InstaCrawler:
         return len(self.driver.find_elements(By.CSS_SELECTOR, "article a[href*='/p/']")) >= need_items_count
 
     def scroll_reels_page(self, need_items_count: int = 100, max_scroll_attempts: int = None) -> bool:
-        logger.debug(f"{need_items_count} ���ȏ�̐��[�����u���^�C�v�ւ̃X�N���[�����s���܂�")
+        logger.debug(f"{need_items_count} 件以上のリールを目標にスクロールします")
         attempts = max_scroll_attempts or max(need_items_count // 3, 5)
         for _ in range(attempts):
             items = self.driver.find_elements(By.CSS_SELECTOR, self.REEL_ITEM_CONTAINER_SELECTOR)
@@ -458,21 +459,34 @@ class InstaCrawler:
             logger.warning("投稿日タイムスタンプの取得に失敗しました", exc_info=True)
 
         try:
-            audio_elem = self.driver.find_element(By.CSS_SELECTOR, self.VIDEO_AUDIO_INFO_SELECTOR)
-            heavy_data["audio_info_text"] = audio_elem.text
-        except NoSuchElementException:
-            logger.debug("音源情報が見つかりませんでした")
-
-        try:
-            title_elem = self.driver.find_element(By.CSS_SELECTOR, self.VIDEO_TITLE_SELECTOR)
+            title_elem = self.wait.until(
+                EC.presence_of_element_located((By.CSS_SELECTOR, self.VIDEO_TITLE_SELECTOR))
+            )
             # ハッシュタグを含む全文を innerText/textContent で取得（改行も保持）
+            raw_inner = title_elem.get_attribute("innerText")
+            raw_text_content = title_elem.get_attribute("textContent")
+            raw_text = title_elem.text
             heavy_data["video_title"] = (
                 title_elem.get_attribute("innerText")
                 or title_elem.get_attribute("textContent")
                 or title_elem.text
             )
-        except NoSuchElementException:
+            logger.debug(
+                "video_title取得: innerText=%s textContent=%s text=%s",
+                raw_inner,
+                raw_text_content,
+                raw_text,
+            )
+        except TimeoutException:
             logger.debug("動画タイトルが見つかりませんでした")
+
+        try:
+            audio_elem = self.wait.until(
+                EC.presence_of_element_located((By.CSS_SELECTOR, self.VIDEO_AUDIO_INFO_SELECTOR))
+            )
+            heavy_data["audio_info_text"] = audio_elem.text
+        except TimeoutException:
+            logger.debug("音源情報が見つかりませんでした")
 
         if fetch_comments:
             comments: List[str] = []
@@ -720,14 +734,12 @@ class InstaCrawler:
                         "video_id": video_id,
                         "user_username": user_username,
                         "video_thumbnail_url": thumbnail_url,
-                        "video_alt_info_text": "",
-                        "like_count_text": None,
-                        "play_count_text": view_count_text,
-                        "crawling_algorithm": "instagram-reels-grid-v1",
-                        "is_pinned": is_pinned,
+                    "like_count_text": None,
+                    "play_count_text": view_count_text,
+                    "crawling_algorithm": "instagram-reels-grid-v1",
+                    "is_pinned": is_pinned,
                     }
                 )
-                self._random_sleep(0.8, 1.5)
             except NoSuchElementException:
                 logger.warning("リールのメタデータ取得で要素不足が発生しました", exc_info=True)
                 continue
@@ -769,53 +781,103 @@ class InstaCrawler:
         return user_nickname
 
     def parse_and_save_video_light_datas(
-        self, light_like_datas: List[Dict], user_nickname: Optional[str] = None
+        self,
+        light_like_datas: List[Dict],
+        user_nickname: Optional[str] = None,
+        save_light: bool = True,
+        publish: bool = True,
     ):
         logger.debug("ライトデータをパースして保存します")
         for like_data in light_like_datas:
-            video_title_text = like_data.get("video_title") or like_data.get("video_alt_info_text") or ""
-            post_time_iso = like_data.get("post_time_iso")
-            post_time_value = self._parse_datetime_attr(post_time_iso)
+            video_title_text = like_data.get("video_title") or ""
             audio_title = like_data.get("audio_title") or like_data.get("audio_info_text")
-            data = VideoLightRawData(
+            play_count_text = like_data.get("play_count_text")
+            play_count = parse_insta_number(play_count_text)
+            crawled_at = datetime.now()
+
+            light_data = InstaLightRawData(
                 id=None,
                 video_url=like_data["video_url"],
                 video_id=like_data["video_id"],
                 user_username=like_data["user_username"],
                 video_thumbnail_url=like_data["video_thumbnail_url"],
-                video_alt_info_text=video_title_text,
-                like_count_text=None,
-                like_count=None,
-                play_count_text=like_data.get("play_count_text"),
-                play_count=parse_insta_number(like_data.get("play_count_text")),
+                play_count_text=play_count_text,
+                play_count=play_count,
+                crawling_algorithm=like_data["crawling_algorithm"],
+                crawled_at=crawled_at,
+            )
+            if save_light:
+                self.video_repo.save_insta_light_data(light_data)
+
+            if publish:
+                message_data = {
+                    "video_id": light_data.video_id,
+                    "video_url": light_data.video_url,
+                    "user_username": light_data.user_username,
+                    "user_nickname": user_nickname,
+                    "video_thumbnail_url": light_data.video_thumbnail_url,
+                    "video_title": video_title_text,
+                    "like_count": None,
+                    "play_count": play_count,
+                    "audio_info_text": like_data.get("audio_info_text"),
+                    "audio_title": audio_title,
+                    "post_time_text": like_data.get("post_time_text"),
+                    "post_time_iso": like_data.get("post_time_iso"),
+                    "comments_json": like_data.get("comments_json"),
+                }
+                self._publish_video_master_sync(message_data)
+
+        if save_light:
+            logger.info(f"ライトデータを保存しました: {len(light_like_datas)} 件")
+
+    def parse_and_save_video_heavy_datas(
+        self,
+        light_like_datas: List[Dict],
+        user_nickname: Optional[str] = None,
+        save_heavy: bool = True,
+        publish: bool = True,
+    ):
+        logger.debug("ヘビーデータをパースして保存します")
+        for like_data in light_like_datas:
+            video_title_text = like_data.get("video_title") or ""
+            post_time_iso = like_data.get("post_time_iso")
+            post_time_value = self._parse_datetime_attr(post_time_iso)
+            audio_title = like_data.get("audio_title") or like_data.get("audio_info_text")
+            play_count_text = like_data.get("play_count_text")
+            play_count = parse_insta_number(play_count_text)
+
+            heavy_data = InstaHeavyRawData(
+                id=None,
+                video_url=like_data["video_url"],
+                video_id=like_data["video_id"],
+                video_title=video_title_text,
+                post_time_text=like_data.get("post_time_text") or "",
+                post_time=post_time_value,
                 crawling_algorithm=like_data["crawling_algorithm"],
                 crawled_at=datetime.now(),
-                post_time_text=like_data.get("post_time_text"),
-                post_time=post_time_value,
                 comments_json=like_data.get("comments_json"),
                 audio_title=audio_title,
             )
-            self.video_repo.save_insta_light_data(data)
-            self.video_repo.save_insta_heavy_data(data)
+            if save_heavy:
+                self.video_repo.save_insta_heavy_data(heavy_data)
 
-            message_data = {
-                "video_id": data.video_id,
-                "video_url": data.video_url,
-                "user_username": data.user_username,
-                "user_nickname": user_nickname,
-                "video_thumbnail_url": data.video_thumbnail_url,
-                "video_title": video_title_text,
-                "like_count": None,
-                "play_count": data.play_count,
-                "audio_info_text": like_data.get("audio_info_text"),
-                "audio_title": audio_title,
-                "post_time_text": like_data.get("post_time_text"),
-                "post_time_iso": post_time_iso,
-                "comments_json": like_data.get("comments_json"),
-            }
-            self._publish_video_master_sync(message_data)
+            if publish:
+                message_data = {
+                    "video_id": heavy_data.video_id,
+                    "url": heavy_data.video_url,
+                    "username": like_data.get("user_username"),
+                    "nickname": user_nickname,
+                    "play_count": play_count,
+                    "thumbnail_url": like_data.get("video_thumbnail_url"),
+                    "video_title": video_title_text,
+                    "post_time": post_time_iso,
+                    "audio_title": audio_title,
+                    "comments_json": like_data.get("comments_json"),
+                }
+                self._publish_video_master_sync(message_data)
 
-        logger.info(f"ライトデータを保存しました: {len(light_like_datas)} 件")
+        if save_heavy:
+            logger.info(f"ヘビーデータを保存しました: {len(light_like_datas)} 件")
 
     def get_user_followers_count_from_user_page(self) -> Tuple[Optional[str], Optional[int]]:
         logger.debug("フォロワー数を取得します")
@@ -833,7 +895,9 @@ class InstaCrawler:
             logger.warning("フォロワー数要素が見つかりませんでした", exc_info=True)
         return None, None
 
-    def crawl_user(self, user: FavoriteUser, max_videos_per_user: int = 100):
+    def crawl_user(
+        self, user: FavoriteUser, max_videos_per_user: int = 100, mode: str = "both"
+    ):
         logger.info(f"ユーザー @{user.favorite_user_username} のライトデータクロールを開始します")
         try:
             self.navigate_to_user_page(user.favorite_user_username)
@@ -859,6 +923,24 @@ class InstaCrawler:
         light_like_datas = self.get_video_like_dates_from_user_page(
             user.favorite_user_username, max_videos=max_videos_per_user
         )
+        if mode == "light":
+            self.parse_and_save_video_light_datas(
+                light_like_datas,
+                user_nickname=user_nickname,
+                publish=True,
+            )
+            self.favorite_user_repo.update_favorite_user_last_crawled(
+                user.favorite_user_username, datetime.now()
+            )
+            logger.info(f"ユーザー @{user.favorite_user_username} のクロールが完了しました")
+            return True
+
+        if mode == "both":
+            self.parse_and_save_video_light_datas(
+                light_like_datas,
+                user_nickname=user_nickname,
+                publish=False,
+            )
         # user_username引数を追加
         heavy_data_map = self.collect_reel_heavy_data_map(
             light_like_datas,
@@ -878,7 +960,11 @@ class InstaCrawler:
                         "comments_json": heavy.get("comments_json"),
                     }
                 )
-        self.parse_and_save_video_light_datas(light_like_datas, user_nickname=user_nickname)
+        self.parse_and_save_video_heavy_datas(
+            light_like_datas,
+            user_nickname=user_nickname,
+            publish=False,
+        )
 
         self.favorite_user_repo.update_favorite_user_last_crawled(
             user.favorite_user_username, datetime.now()
@@ -886,14 +972,16 @@ class InstaCrawler:
         logger.info(f"ユーザー @{user.favorite_user_username} のクロールが完了しました")
         return True
 
-    def crawl_favorite_users(self, max_videos_per_user: int = 100, max_users: int = 10):
-        logger.info(f"{max_users}件の推しユーザーに対してライトデータをクロールします")
+    def crawl_favorite_users(
+        self, max_videos_per_user: int = 100, max_users: int = 10, mode: str = "both"
+    ):
+        logger.info(f"{max_users}件のユーザーに対してライトデータをクロールします")
         favorite_users = self.favorite_user_repo.get_favorite_users(
             self.crawler_account.id, limit=max_users
         )
         for user in favorite_users:
             try:
-                self.crawl_user(user, max_videos_per_user=max_videos_per_user)
+                self.crawl_user(user, max_videos_per_user=max_videos_per_user, mode=mode)
             except KeyboardInterrupt:
                 raise
             except Exception:
@@ -901,7 +989,7 @@ class InstaCrawler:
                     f"ユーザー @{user.favorite_user_username} のクロール中にエラーが発生しました"
                 )
                 continue
-        logger.info(f"{len(favorite_users)}件の推しユーザーに対するクロールが完了しました")
+        logger.info(f"{len(favorite_users)}件のユーザーに対するクロールが完了しました")
 
 
 def main():
@@ -951,9 +1039,9 @@ def main():
     )
     parser.add_argument(
         "--mode",
-        choices=["light", "test"],
-        default="light",
-        help="light: クロール実行, test: ログインのみで停止",
+        choices=["light", "heavy", "both", "test"],
+        default="both",
+        help="light: ライトのみ, heavy: ヘビーのみ, both: 両方, test: ログインのみで停止",
     )
     parser.add_argument(
         "--no-proxy",
@@ -1009,6 +1097,7 @@ def main():
                 crawler.crawl_favorite_users(
                     max_videos_per_user=args.max_videos_per_user,
                     max_users=args.max_users,
+                    mode=args.mode,
                 )
 
 
