@@ -10,9 +10,6 @@ from typing import Dict, Any, List, Optional
 
 from google.cloud import pubsub_v1
 
-DEFAULT_STATE_DIR = r"\Users\Administrator\TikTokCrawlSel_v2\crawler_state"
-THRESHOLD_SEC = 48 * 3600  # 48 hours
-
 def ensure_dir(p: str) -> None:
     Path(p).mkdir(parents=True, exist_ok=True)
 
@@ -37,58 +34,6 @@ def setup_logger(subscription: str, log_dir: str) -> logging.Logger:
     logger.info("Logger initialized. log_path=%s", log_path)
     return logger
 
-def _base_state_dir(state_dir: Optional[str], working_dir: str) -> str:
-    if state_dir:
-        return state_dir
-    # fallback to DEFAULT_STATE_DIR; if it's blank for some reason, use working_dir\.state
-    base = DEFAULT_STATE_DIR or os.path.join(working_dir, ".state")
-    return base
-
-def state_file_path(subscription_name: str, state_dir: Optional[str], working_dir: str) -> str:
-    base = _base_state_dir(state_dir, working_dir)
-    ensure_dir(base)
-    return os.path.join(base, f"{subscription_name}.last")
-
-def lock_file_path(subscription_name: str, state_dir: Optional[str], working_dir: str) -> str:
-    base = _base_state_dir(state_dir, working_dir)
-    ensure_dir(base)
-    return os.path.join(base, f"{subscription_name}.lock")
-
-def read_last_run(subscription_name: str, state_dir: Optional[str], working_dir: str) -> float:
-    f = state_file_path(subscription_name, state_dir, working_dir)
-    try:
-        with open(f, "r", encoding="utf-8") as fp:
-            return float(fp.read().strip())
-    except Exception:
-        return 0.0
-
-def should_run(subscription_name: str, state_dir: Optional[str], working_dir: str) -> bool:
-    last = read_last_run(subscription_name, state_dir, working_dir)
-    now = time.time()
-    return (now - last) >= THRESHOLD_SEC
-
-def mark_success(subscription_name: str, state_dir: Optional[str], working_dir: str) -> None:
-    f = state_file_path(subscription_name, state_dir, working_dir)
-    tmp = f + ".tmp"
-    with open(tmp, "w", encoding="utf-8") as fp:
-        fp.write(str(time.time()))
-    os.replace(tmp, f)
-
-def acquire_lock(subscription_name: str, state_dir: Optional[str], working_dir: str) -> bool:
-    lock_path = lock_file_path(subscription_name, state_dir, working_dir)
-    try:
-        with open(lock_path, "x", encoding="utf-8") as fp:
-            fp.write(str(os.getpid()))
-        return True
-    except FileExistsError:
-        return False
-
-def release_lock(subscription_name: str, state_dir: Optional[str], working_dir: str) -> None:
-    try:
-        os.remove(lock_file_path(subscription_name, state_dir, working_dir))
-    except FileNotFoundError:
-        pass
-
 def build_command(python_path: str, body: Dict[str, Any], extra_args: List[str]) -> List[str]:
     base = [python_path, "-m", "src.crawler.tiktok_crawler"]
     args = body.get("args", [])
@@ -99,7 +44,6 @@ def worker(project_id: str, subcfg: Dict[str, Any], credentials_path: Optional[s
     working_dir = subcfg["working_dir"]
     python_path = subcfg["python_path"]
     extra_args = subcfg.get("extra_args", [])
-    state_dir = subcfg.get("state_dir")  # optional
     log_dir = subcfg.get("log_dir") or os.path.join(working_dir, "logs")
     logger = setup_logger(subscription, log_dir)
 
@@ -112,65 +56,56 @@ def worker(project_id: str, subcfg: Dict[str, Any], credentials_path: Optional[s
     logger.info("Worker initialized. subscription=%s working_dir=%s python_path=%s", subscription, working_dir, python_path)
 
     def callback(message: pubsub_v1.subscriber.message.Message):
+        msg_id = message.message_id
+        logger.info("Callback start. message_id=%s", msg_id)
         try:
             body = json.loads(message.data.decode("utf-8")) if message.data else {}
         except Exception:
             raw = message.data.decode("utf-8", errors="replace") if message.data else ""
             body = {}
-            logger.warning("JSON decode failed. message_id=%s raw=%s", message.message_id, raw)
+            logger.warning("JSON decode failed. message_id=%s raw=%s", msg_id, raw)
 
         logger.info(
             "Message received. message_id=%s attributes=%s data_len=%s body=%s",
-            message.message_id,
+            msg_id,
             message.attributes,
             len(message.data or b""),
             json.dumps(body, ensure_ascii=True),
         )
 
-        last = read_last_run(subscription, state_dir, working_dir)
-        now = time.time()
-        age = now - last if last else None
-        if age is not None and age < THRESHOLD_SEC:
-            logger.info("Skip (within 48h). last_run_age_sec=%.1f ACK.", age)
-            message.ack()
-            return
-
-        if not acquire_lock(subscription, state_dir, working_dir):
-            logger.warning("Lock exists. NACK for retry.")
-            message.nack()
-            return
-
         cmd = build_command(python_path, body, extra_args)
         try:
             cmd_display = " ".join([f'\"{c}\"' if " " in str(c) else str(c) for c in cmd])
-            logger.info("Executing: %s", cmd_display)
+            logger.info("Subprocess starting. message_id=%s cmd=%s", msg_id, cmd_display)
             start = time.time()
             result = subprocess.run(cmd, check=True, cwd=working_dir, capture_output=True, text=True)
             elapsed = time.time() - start
+            logger.info("Subprocess finished. message_id=%s returncode=0 elapsed_sec=%.2f", msg_id, elapsed)
             if result.stdout:
                 logger.info("stdout:\n%s", result.stdout.rstrip())
             if result.stderr:
                 logger.warning("stderr:\n%s", result.stderr.rstrip())
-            mark_success(subscription, state_dir, working_dir)
+            logger.info("ACKing message. message_id=%s", msg_id)
             message.ack()
-            logger.info("Done and ACKed. elapsed_sec=%.2f", elapsed)
+            logger.info("Done and ACKed. message_id=%s elapsed_sec=%.2f", msg_id, elapsed)
         except subprocess.CalledProcessError as e:
             elapsed = time.time() - start if "start" in locals() else None
             if elapsed is not None:
-                logger.error("Subprocess failed. returncode=%s elapsed_sec=%.2f NACK.", e.returncode, elapsed)
+                logger.error("Subprocess failed. message_id=%s returncode=%s elapsed_sec=%.2f NACK.", msg_id, e.returncode, elapsed)
             else:
-                logger.error("Subprocess failed. returncode=%s NACK.", e.returncode)
+                logger.error("Subprocess failed. message_id=%s returncode=%s NACK.", msg_id, e.returncode)
             if e.stdout:
                 logger.info("stdout:\n%s", e.stdout.rstrip())
             if e.stderr:
                 logger.error("stderr:\n%s", e.stderr.rstrip())
+            logger.info("NACKing message. message_id=%s", msg_id)
             message.nack()
         except Exception as e:
-            logger.exception("Unexpected error. NACK.")
+            logger.exception("Unexpected error. message_id=%s NACK.", msg_id)
+            logger.info("NACKing message. message_id=%s", msg_id)
             message.nack()
         finally:
-            release_lock(subscription, state_dir, working_dir)
-            logger.info("Lock released.")
+            logger.info("Callback end. message_id=%s", msg_id)
 
     streaming_pull_future = subscriber.subscribe(
         sub_path,

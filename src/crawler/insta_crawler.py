@@ -997,6 +997,13 @@ def main():
 
     parser = argparse.ArgumentParser(description="Instagramライトデータクローラー")
     parser.add_argument(
+        "mode",
+        nargs="?",
+        choices=["light", "heavy", "both", "test"],
+        default="both",
+        help="light: ライトのみ, heavy: ヘビーのみ, both: 両方, test: ログインのみで停止",
+    )
+    parser.add_argument(
         "--crawler-account-id",
         type=int,
         help="利用するクローラーアカウントID（未指定の場合は自動割当）",
@@ -1038,17 +1045,13 @@ def main():
         help="Instagramホーム到達までのログイン確認のみを行い、到達後すぐ終了する",
     )
     parser.add_argument(
-        "--mode",
-        choices=["light", "heavy", "both", "test"],
-        default="both",
-        help="light: ライトのみ, heavy: ヘビーのみ, both: 両方, test: ログインのみで停止",
-    )
-    parser.add_argument(
         "--no-proxy",
         action="store_true",
         help="プロキシを使わず直接接続する",
     )
     args = parser.parse_args()
+
+    mode = args.mode
 
     if args.use_profile and not args.chrome_user_data_dir:
         parser.error("--use-profile を使う場合は --chrome-user-data-dir を指定してください")
@@ -1061,7 +1064,7 @@ def main():
         favorite_user_repo = InstaFavoriteUserRepository(db)
         video_repo = InstaVideoRepository(db)
 
-        if args.test or args.mode == "test":
+        if args.test or mode == "test":
             crawler = InstaCrawler(
                 crawler_account_repo=crawler_account_repo,
                 favorite_user_repo=favorite_user_repo,
@@ -1097,7 +1100,7 @@ def main():
                 crawler.crawl_favorite_users(
                     max_videos_per_user=args.max_videos_per_user,
                     max_users=args.max_users,
-                    mode=args.mode,
+                    mode=mode,
                 )
 
 
