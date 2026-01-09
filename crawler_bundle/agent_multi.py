@@ -50,7 +50,10 @@ def worker(project_id: str, subcfg: Dict[str, Any], credentials_path: Optional[s
     if credentials_path:
         os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = credentials_path
 
-    flow_control = pubsub_v1.types.FlowControl(max_messages=1)
+    flow_control = pubsub_v1.types.FlowControl(
+        max_messages=1,
+        max_lease_duration=24 * 3600,
+    )
     subscriber = pubsub_v1.SubscriberClient()
     sub_path = subscriber.subscription_path(project_id, subscription)
     logger.info("Worker initialized. subscription=%s working_dir=%s python_path=%s", subscription, working_dir, python_path)
@@ -110,7 +113,7 @@ def worker(project_id: str, subcfg: Dict[str, Any], credentials_path: Optional[s
     streaming_pull_future = subscriber.subscribe(
         sub_path,
         callback=callback,
-        flow_control=pubsub_v1.types.FlowControl(max_messages=1)
+        flow_control=flow_control,
     )
     logger.info("Listening on %s ...", sub_path)
     try:
