@@ -1,6 +1,9 @@
 {
   "project_id": "tiktok-analytics-prod-451609",
   "credentials_path": "C:\\keys\\gcp-sa.json",
+  "retry_topic": "crawler-auto-jobs",
+  "max_retries": 3,
+  "queue_dir": "C:\\Users\\Administrator\\TikTokCrawlSel_v2\\queue",
   "subscriptions": [
     {
       "subscription_name": "pc-01-s1",
