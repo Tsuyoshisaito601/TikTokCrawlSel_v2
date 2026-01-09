@@ -4,6 +4,7 @@ venv/
 .venv/
 *.log
 logs/
+queue/
 # Python cache
 __pycache__/
 *.py[cod]
