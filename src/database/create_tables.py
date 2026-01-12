@@ -20,6 +20,17 @@ CREATE_TABLES_SQL = [
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
     """,
     """
+    CREATE TABLE IF NOT EXISTS crawler_error_logs (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        subscription_name VARCHAR(255) NOT NULL,
+        error_genre VARCHAR(100) NOT NULL,
+        created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        INDEX idx_subscription_name (subscription_name),
+        INDEX idx_error_genre (error_genre),
+        INDEX idx_created_at (created_at)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+    """,
+    """
 CREATE TABLE account_list (
   id INT NOT NULL AUTO_INCREMENT,
   account_url VARCHAR(255) DEFAULT NULL,

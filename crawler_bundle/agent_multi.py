@@ -8,9 +8,18 @@ import threading
 import logging
 import uuid
 from pathlib import Path
-from typing import Dict, Any, List, Optional
+from typing import Dict, Any, List, Optional, Tuple
 
+import mysql.connector
+from dotenv import load_dotenv
 from google.cloud import pubsub_v1
+
+ERROR_EXIT_CODE_TO_GENRE = {
+    41: "proxy_block",
+    42: "chrome_version",
+    43: "unknown",
+}
+PROXY_BLOCK_RETRY_DELAY_SEC = 300
 
 def ensure_dir(p: str) -> None:
     Path(p).mkdir(parents=True, exist_ok=True)
@@ -55,6 +64,65 @@ def _write_json(path: str, payload: Dict[str, Any]) -> None:
     with open(tmp, "w", encoding="utf-8") as fp:
         json.dump(payload, fp, ensure_ascii=True)
     os.replace(tmp, path)
+
+def _load_db_config(working_dir: str, logger: logging.Logger) -> Optional[Dict[str, str]]:
+    env_path = Path(working_dir) / ".env"
+    if env_path.exists():
+        load_dotenv(env_path)
+    else:
+        load_dotenv()
+
+    config = {
+        "host": os.getenv("MYSQL_HOST", ""),
+        "user": os.getenv("MYSQL_USER", ""),
+        "password": os.getenv("MYSQL_PASSWORD", ""),
+        "database": os.getenv("MYSQL_DATABASE", ""),
+    }
+    if not all(config.values()):
+        masked = {key: bool(value) for key, value in config.items()}
+        logger.warning("DB config missing. skip error log. config=%s", masked)
+        return None
+    return config
+
+def _insert_error_log(
+    db_config: Optional[Dict[str, str]],
+    subscription: str,
+    error_genre: str,
+    logger: logging.Logger,
+) -> bool:
+    if not db_config:
+        return False
+    conn = None
+    try:
+        conn = mysql.connector.connect(**db_config)
+        cursor = conn.cursor()
+        cursor.execute(
+            """
+            INSERT INTO crawler_error_logs (subscription_name, error_genre, created_at)
+            VALUES (%s, %s, NOW())
+            """,
+            (subscription, error_genre),
+        )
+        conn.commit()
+        cursor.close()
+        logger.info("Error log saved. subscription=%s error_genre=%s", subscription, error_genre)
+        return True
+    except mysql.connector.Error:
+        logger.exception("Error log insert failed. subscription=%s error_genre=%s", subscription, error_genre)
+        return False
+    finally:
+        if conn:
+            conn.close()
+
+def _error_genre_from_returncode(returncode: int) -> Optional[str]:
+    return ERROR_EXIT_CODE_TO_GENRE.get(returncode)
+
+def _retry_policy(error_genre: Optional[str], default_max_retries: int) -> Tuple[int, int]:
+    if default_max_retries <= 0:
+        return 0, 0
+    if error_genre == "proxy_block":
+        return default_max_retries, PROXY_BLOCK_RETRY_DELAY_SEC
+    return 1, 0
 
 def _save_queue_message(queue_dir: str, message_id: str, data: bytes, attributes: Dict[str, str]) -> Dict[str, Any]:
     safe_id = _sanitize_message_id(message_id)
@@ -108,6 +176,7 @@ def worker(project_id: str, subcfg: Dict[str, Any], credentials_path: Optional[s
     extra_args = subcfg.get("extra_args", [])
     log_dir = subcfg.get("log_dir") or os.path.join(working_dir, "logs")
     logger = setup_logger(subscription, log_dir)
+    db_config = _load_db_config(working_dir, logger)
     queue_dir = _queue_dir_path(subcfg.get("queue_dir"), subscription, working_dir)
     logger.info("Queue dir initialized. path=%s", queue_dir)
     retry_topic = subcfg.get("retry_topic")
@@ -167,12 +236,14 @@ def worker(project_id: str, subcfg: Dict[str, Any], credentials_path: Optional[s
         data: bytes,
         attributes: Dict[str, str],
         retry_count: int,
-        reason: str
+        reason: str,
+        error_genre: Optional[str],
     ) -> bool:
         if not publisher or not retry_topic_path:
             logger.warning("Retry skipped (publisher not configured). message_id=%s reason=%s", msg_id, reason)
             return False
-        if retry_count >= max_retries:
+        effective_max_retries, delay_seconds = _retry_policy(error_genre, max_retries)
+        if retry_count >= effective_max_retries:
             logger.warning("Retry skipped (max reached). message_id=%s retry_count=%s reason=%s", msg_id, retry_count, reason)
             return False
         next_count = retry_count + 1
@@ -180,15 +251,27 @@ def worker(project_id: str, subcfg: Dict[str, Any], credentials_path: Optional[s
         retry_attributes["retry_count"] = str(next_count)
         retry_attributes.setdefault("origin_message_id", msg_id)
         retry_attributes.setdefault("origin_subscription", subscription)
+        if error_genre:
+            retry_attributes.setdefault("error_genre", error_genre)
+        if delay_seconds > 0:
+            logger.warning(
+                "Retry delayed. message_id=%s delay_sec=%s reason=%s error_genre=%s",
+                msg_id,
+                delay_seconds,
+                reason,
+                error_genre,
+            )
+            time.sleep(delay_seconds)
         try:
             future = publisher.publish(retry_topic_path, data or b"", **retry_attributes)
             publish_id = future.result()
             logger.info(
-                "Retry published. message_id=%s retry_count=%s publish_id=%s reason=%s",
+                "Retry published. message_id=%s retry_count=%s publish_id=%s reason=%s error_genre=%s",
                 msg_id,
                 next_count,
                 publish_id,
                 reason,
+                error_genre,
             )
             return True
         except Exception:
@@ -236,11 +319,14 @@ def worker(project_id: str, subcfg: Dict[str, Any], credentials_path: Optional[s
                 logger.info("stdout:\n%s", e.stdout.rstrip())
             if e.stderr:
                 logger.error("stderr:\n%s", e.stderr.rstrip())
+            error_genre = _error_genre_from_returncode(e.returncode)
+            if error_genre:
+                _insert_error_log(db_config, subscription, error_genre, logger)
             if queue_payload and queue_path:
                 queue_payload["last_error"] = f"subprocess_failed:{e.returncode}"
                 queue_payload["last_error_at"] = time.time()
                 _write_json(queue_path, queue_payload)
-            published = publish_retry(msg_id, data, attributes, retry_count, "subprocess_failed")
+            published = publish_retry(msg_id, data, attributes, retry_count, "subprocess_failed", error_genre)
             if published and queue_path:
                 os.remove(queue_path)
                 logger.info("Queue file removed after retry publish. message_id=%s path=%s", msg_id, queue_path)
@@ -250,7 +336,7 @@ def worker(project_id: str, subcfg: Dict[str, Any], credentials_path: Optional[s
                 queue_payload["last_error"] = "unexpected_error"
                 queue_payload["last_error_at"] = time.time()
                 _write_json(queue_path, queue_payload)
-            published = publish_retry(msg_id, data, attributes, retry_count, "unexpected_error")
+            published = publish_retry(msg_id, data, attributes, retry_count, "unexpected_error", None)
             if published and queue_path:
                 os.remove(queue_path)
                 logger.info("Queue file removed after retry publish. message_id=%s path=%s", msg_id, queue_path)

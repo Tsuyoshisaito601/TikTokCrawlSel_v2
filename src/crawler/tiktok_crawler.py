@@ -4,7 +4,14 @@ from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
-from selenium.common.exceptions import TimeoutException, NoSuchElementException
+from selenium.common.exceptions import (
+    TimeoutException,
+    NoSuchElementException,
+    WebDriverException,
+    SessionNotCreatedException,
+    InvalidSessionIdException,
+    NoSuchWindowException,
+)
 from datetime import datetime, timedelta
 import random
 import time
@@ -27,6 +34,37 @@ from selenium.webdriver.common.actions import interaction
 logger = setup_logger(__name__)
 pubsub_emulator_host = os.getenv('PUBSUB_EMULATOR_HOST')
 project_id = os.getenv('PROJECT_ID') 
+
+SELENIUM_ERROR_EXIT_CODES = {
+    "proxy_block": 41,
+    "chrome_version": 42,
+    "unknown": 43,
+}
+
+def _iter_exception_chain(exc: Exception):
+    seen = set()
+    while exc and id(exc) not in seen:
+        yield exc
+        seen.add(id(exc))
+        exc = exc.__cause__ or exc.__context__
+
+def _detect_selenium_error_genre(exc: Exception) -> Optional[str]:
+    chain = list(_iter_exception_chain(exc))
+    for err in chain:
+        msg = str(err)
+        if isinstance(err, WebDriverException) and "ERR_TUNNEL_CONNECTION_FAILED" in msg:
+            return "proxy_block"
+        if isinstance(err, SessionNotCreatedException) and (
+            "only supports Chrome version" in msg or "Current browser version" in msg
+        ):
+            return "chrome_version"
+    for err in chain:
+        if isinstance(
+            err,
+            (WebDriverException, SessionNotCreatedException, InvalidSessionIdException, NoSuchWindowException),
+        ):
+            return "unknown"
+    return None
 
 
 
@@ -1893,6 +1931,10 @@ if __name__ == "__main__":
     except KeyboardInterrupt:
         logger.info("ユーザーにより中断されました")
         sys.exit(130)  # 128 + SIGINT(2)
-    except Exception:
+    except Exception as e:
+        error_genre = _detect_selenium_error_genre(e)
+        if error_genre:
+            logger.exception("Selenium error detected. error_genre=%s", error_genre)
+            sys.exit(SELENIUM_ERROR_EXIT_CODES[error_genre])
         logger.exception("予期しないエラーが発生しました")
         sys.exit(1)
