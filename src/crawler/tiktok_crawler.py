@@ -38,7 +38,8 @@ project_id = os.getenv('PROJECT_ID')
 SELENIUM_ERROR_EXIT_CODES = {
     "proxy_block": 41,
     "chrome_version": 42,
-    "unknown": 43,
+    "other_process_exist": 43,
+    "unknown": 44,
 }
 
 def _iter_exception_chain(exc: Exception):
@@ -52,6 +53,10 @@ def _detect_selenium_error_genre(exc: Exception) -> Optional[str]:
     chain = list(_iter_exception_chain(exc))
     for err in chain:
         msg = str(err)
+        if isinstance(err, SessionNotCreatedException) and (
+            "cannot connect to chrome" in msg or "chrome not reachable" in msg
+        ):
+            return "other_process_exist"
         if isinstance(err, WebDriverException) and "ERR_TUNNEL_CONNECTION_FAILED" in msg:
             return "proxy_block"
         if isinstance(err, SessionNotCreatedException) and (

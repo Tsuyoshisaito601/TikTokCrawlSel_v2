@@ -25,6 +25,8 @@ from .selenium_manager import SeleniumManager
 
 logger = setup_logger(__name__)
 project_id = os.getenv("PROJECT_ID")
+RUN_MINUTES = 60
+REST_MINUTES = 30
 
 
 def parse_insta_time(time_text: str, base_time: datetime) -> Optional[datetime]:
@@ -973,12 +975,20 @@ class InstaCrawler:
         return True
 
     def crawl_favorite_users(
-        self, max_videos_per_user: int = 100, max_users: int = 10, mode: str = "both"
-    ):
+        self,
+        max_videos_per_user: int = 100,
+        max_users: int = 10,
+        mode: str = "both",
+        run_deadline: Optional[float] = None,
+    ) -> Tuple[int, bool]:
         logger.info(f"{max_users}件のユーザーに対してライトデータをクロールします")
         favorite_users = self.favorite_user_repo.get_favorite_users(
             self.crawler_account.id, limit=max_users
         )
+        if not favorite_users:
+            logger.info("クロール対象ユーザーが存在しません")
+            return 0, False
+        processed = 0
         for user in favorite_users:
             try:
                 self.crawl_user(user, max_videos_per_user=max_videos_per_user, mode=mode)
@@ -988,8 +998,13 @@ class InstaCrawler:
                 logger.exception(
                     f"ユーザー @{user.favorite_user_username} のクロール中にエラーが発生しました"
                 )
-                continue
+            finally:
+                processed += 1
+            if run_deadline is not None and time.monotonic() >= run_deadline:
+                logger.info("稼働時間の上限に達したため、このユーザーまでで停止します")
+                return processed, True
         logger.info(f"{len(favorite_users)}件のユーザーに対するクロールが完了しました")
+        return processed, False
 
 
 def main():
@@ -1085,23 +1100,32 @@ def main():
             finally:
                 crawler.__exit__(None, None, None)
         else:
-            with InstaCrawler(
-                crawler_account_repo=crawler_account_repo,
-                favorite_user_repo=favorite_user_repo,
-                video_repo=video_repo,
-                crawler_account_id=args.crawler_account_id,
-                sadcaptcha_api_key=os.getenv("SADCAPTCHA_API_KEY"),
-                device_type=args.device_type,
-                use_profile=args.use_profile,
-                chrome_user_data_dir=args.chrome_user_data_dir,
-                chrome_profile_directory=args.chrome_profile_directory,
-                use_proxy=not args.no_proxy,
-            ) as crawler:
-                crawler.crawl_favorite_users(
-                    max_videos_per_user=args.max_videos_per_user,
-                    max_users=args.max_users,
-                    mode=mode,
-                )
+            if RUN_MINUTES <= 0 or REST_MINUTES <= 0:
+                raise ValueError("RUN_MINUTES と REST_MINUTES は1以上に設定してください")
+            run_seconds = RUN_MINUTES * 60
+            rest_seconds = REST_MINUTES * 60
+            while True:
+                with InstaCrawler(
+                    crawler_account_repo=crawler_account_repo,
+                    favorite_user_repo=favorite_user_repo,
+                    video_repo=video_repo,
+                    crawler_account_id=args.crawler_account_id,
+                    sadcaptcha_api_key=os.getenv("SADCAPTCHA_API_KEY"),
+                    device_type=args.device_type,
+                    use_profile=args.use_profile,
+                    chrome_user_data_dir=args.chrome_user_data_dir,
+                    chrome_profile_directory=args.chrome_profile_directory,
+                    use_proxy=not args.no_proxy,
+                ) as crawler:
+                    run_deadline = time.monotonic() + run_seconds
+                    crawler.crawl_favorite_users(
+                        max_videos_per_user=args.max_videos_per_user,
+                        max_users=args.max_users,
+                        mode=mode,
+                        run_deadline=run_deadline,
+                    )
+                logger.info(f"{REST_MINUTES}分休憩します")
+                time.sleep(rest_seconds)
 
 
 if __name__ == "__main__":

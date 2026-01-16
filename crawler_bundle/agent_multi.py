@@ -17,7 +17,8 @@ from google.cloud import pubsub_v1
 ERROR_EXIT_CODE_TO_GENRE = {
     41: "proxy_block",
     42: "chrome_version",
-    43: "unknown",
+    43: "other_process_exist",
+    44: "unknown",
 }
 PROXY_BLOCK_RETRY_DELAY_SEC = 300
 
