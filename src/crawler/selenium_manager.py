@@ -13,7 +13,7 @@ from selenium.common.exceptions import (
 from concurrent.futures import ThreadPoolExecutor
 from typing import Optional
 from ..logger import setup_logger
-import tempfile, shutil, os, time, logging
+import tempfile, shutil, os, time, logging, subprocess
 
 logger = setup_logger(__name__)
 
@@ -28,6 +28,9 @@ class SeleniumManager:
         self.user_data_dir = user_data_dir
         self.profile_directory = profile_directory
         self._temp_profile_dir: Optional[str] = None
+        self._chrome_debugger_address: Optional[str] = None
+        self._chrome_pid: Optional[int] = None
+        self._chrome_log_path: Optional[str] = None
 
     def setup_driver(self):
         try:
@@ -49,6 +52,11 @@ class SeleniumManager:
             options.add_argument(f"--user-data-dir={profile_dir}")
             if self.use_profile and self.profile_directory:
                 options.add_argument(f"--profile-directory={self.profile_directory}")
+            self._chrome_log_path = os.path.join(profile_dir, "chrome_debug.log")
+            options.add_argument("--enable-logging")
+            options.add_argument("--v=1")
+            options.add_argument(f"--log-file={self._chrome_log_path}")
+            logger.info("Chrome log file configured. path=%s", self._chrome_log_path)
             options.add_argument('--no-sandbox')
             options.add_argument('--mute-audio')
             options.add_argument('--use-angle=gl')
@@ -89,6 +97,8 @@ class SeleniumManager:
             options.add_argument("--disable-blink-features=AutomationControlled")
 
             self.driver = uc.Chrome(options=options)
+            self._cache_chrome_process_info()
+            self._log_chrome_process_snapshot("after_start")
 
             # PC用のエミュレーション設定
             if self.device_type == "pc":
@@ -228,8 +238,105 @@ class SeleniumManager:
 
     def quit_driver(self):
         if self.driver:
+            self._log_chrome_process_snapshot("before_quit")
             self.driver.quit()
             logger.info("Chromeドライバーを終了しました")
+            self._log_chrome_process_snapshot("after_quit")
         if self._temp_profile_dir and os.path.isdir(self._temp_profile_dir):
             shutil.rmtree(self._temp_profile_dir, ignore_errors=True)
             self._temp_profile_dir = None
+
+    def _cache_chrome_process_info(self) -> None:
+        self._chrome_debugger_address = self._get_debugger_address()
+        self._chrome_pid = self._pid_from_debugger_address(self._chrome_debugger_address)
+        chromedriver_pid = self._get_chromedriver_pid()
+        logger.info(
+            "Chrome process detected. pid=%s debugger_address=%s chromedriver_pid=%s",
+            self._chrome_pid,
+            self._chrome_debugger_address,
+            chromedriver_pid,
+        )
+
+    def _get_debugger_address(self) -> Optional[str]:
+        try:
+            chrome_options = self.driver.capabilities.get("goog:chromeOptions", {})
+            return chrome_options.get("debuggerAddress")
+        except Exception:
+            return None
+
+    def _get_chromedriver_pid(self) -> Optional[int]:
+        try:
+            service = getattr(self.driver, "service", None)
+            process = getattr(service, "process", None)
+            return getattr(process, "pid", None)
+        except Exception:
+            return None
+
+    def _pid_from_debugger_address(self, debugger_address: Optional[str]) -> Optional[int]:
+        if os.name != "nt" or not debugger_address:
+            return None
+        try:
+            port_str = debugger_address.rsplit(":", 1)[-1]
+            port = int(port_str)
+        except (ValueError, AttributeError):
+            return None
+        try:
+            output = subprocess.check_output(
+                "netstat -ano -p tcp",
+                shell=True,
+                text=True,
+                stderr=subprocess.DEVNULL,
+            )
+        except Exception:
+            return None
+        target = f":{port} "
+        for line in output.splitlines():
+            if target in line and "LISTENING" in line:
+                parts = line.split()
+                if parts:
+                    pid_str = parts[-1]
+                    if pid_str.isdigit():
+                        return int(pid_str)
+        return None
+
+    def _get_process_command_line(self, pid: Optional[int]) -> Optional[str]:
+        if os.name != "nt" or not pid:
+            return None
+        try:
+            cmd = [
+                "powershell",
+                "-NoProfile",
+                "-Command",
+                f"(Get-CimInstance Win32_Process -Filter \"ProcessId={pid}\").CommandLine",
+            ]
+            output = subprocess.check_output(cmd, text=True, stderr=subprocess.DEVNULL).strip()
+            return output or None
+        except Exception:
+            return None
+
+    def _process_exists(self, pid: Optional[int]) -> Optional[bool]:
+        if os.name != "nt" or not pid:
+            return None
+        try:
+            output = subprocess.check_output(
+                ["tasklist", "/FI", f"PID eq {pid}"],
+                text=True,
+                stderr=subprocess.DEVNULL,
+            )
+            return str(pid) in output
+        except Exception:
+            return None
+
+    def _log_chrome_process_snapshot(self, stage: str) -> None:
+        if not self._chrome_pid and self.driver:
+            self._cache_chrome_process_info()
+        cmdline = self._get_process_command_line(self._chrome_pid)
+        exists = self._process_exists(self._chrome_pid)
+        logger.info(
+            "Chrome process snapshot. stage=%s pid=%s exists=%s debugger_address=%s cmdline=%s",
+            stage,
+            self._chrome_pid,
+            exists,
+            self._chrome_debugger_address,
+            cmdline,
+        )
