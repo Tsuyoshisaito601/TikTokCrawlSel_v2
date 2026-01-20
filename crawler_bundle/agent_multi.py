@@ -2,6 +2,7 @@ import base64
 import json
 import os
 import sys
+import re
 import time
 import subprocess
 import threading
@@ -46,8 +47,24 @@ def setup_logger(subscription: str, log_dir: str) -> logging.Logger:
     logger.info("Logger initialized. log_path=%s", log_path)
     return logger
 
-def build_command(python_path: str, body: Dict[str, Any], extra_args: List[str]) -> List[str]:
-    base = [python_path, "-m", "src.crawler.tiktok_crawler"]
+_MODULE_NAME_RE = re.compile(r"^[a-zA-Z0-9_.]+$")
+
+def _select_module_name(body: Dict[str, Any], logger: logging.Logger) -> str:
+    raw = body.get("module")
+    if isinstance(raw, str) and _MODULE_NAME_RE.match(raw) and raw.startswith("src."):
+        return raw
+    if raw:
+        logger.warning("Invalid module override. module=%s", raw)
+    return "src.crawler.tiktok_crawler"
+
+def build_command(
+    python_path: str,
+    body: Dict[str, Any],
+    extra_args: List[str],
+    logger: logging.Logger,
+) -> List[str]:
+    module_name = _select_module_name(body, logger)
+    base = [python_path, "-m", module_name]
     args = body.get("args", [])
     return base + list(args) + list(extra_args or [])
 
@@ -294,7 +311,7 @@ def worker(project_id: str, subcfg: Dict[str, Any], credentials_path: Optional[s
             queue_payload["last_attempt_at"] = time.time()
             _write_json(queue_path, queue_payload)
         body = _parse_body(data, logger, msg_id)
-        cmd = build_command(python_path, body, extra_args)
+        cmd = build_command(python_path, body, extra_args, logger)
         try:
             cmd_display = " ".join([f'\"{c}\"' if " " in str(c) else str(c) for c in cmd])
             logger.info("Subprocess starting. message_id=%s source=%s cmd=%s", msg_id, source, cmd_display)

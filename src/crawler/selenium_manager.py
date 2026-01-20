@@ -28,6 +28,7 @@ class SeleniumManager:
         self.user_data_dir = user_data_dir
         self.profile_directory = profile_directory
         self._temp_profile_dir: Optional[str] = None
+        self._active_profile_dir: Optional[str] = None
         self._chrome_debugger_address: Optional[str] = None
         self._chrome_pid: Optional[int] = None
         self._chrome_log_path: Optional[str] = None
@@ -43,6 +44,7 @@ class SeleniumManager:
             else:
                 profile_dir = tempfile.mkdtemp(prefix="sel_profile_")
                 self._temp_profile_dir = profile_dir
+            self._active_profile_dir = profile_dir
             # 既存のオプション設定
             options = uc.ChromeOptions()
             if self.proxy:
@@ -242,9 +244,11 @@ class SeleniumManager:
             self.driver.quit()
             logger.info("Chromeドライバーを終了しました")
             self._log_chrome_process_snapshot("after_quit")
+            self._force_kill_orphaned_chrome()
         if self._temp_profile_dir and os.path.isdir(self._temp_profile_dir):
             shutil.rmtree(self._temp_profile_dir, ignore_errors=True)
             self._temp_profile_dir = None
+        self._active_profile_dir = None
 
     def _cache_chrome_process_info(self) -> None:
         self._chrome_debugger_address = self._get_debugger_address()
@@ -340,3 +344,47 @@ class SeleniumManager:
             self._chrome_debugger_address,
             cmdline,
         )
+
+    def _force_kill_orphaned_chrome(self) -> None:
+        exists = self._process_exists(self._chrome_pid)
+        if not exists:
+            return
+        cmdline = self._get_process_command_line(self._chrome_pid)
+        if not self._should_force_kill(cmdline):
+            logger.warning(
+                "Chrome still running after quit but cmdline did not match. pid=%s cmdline=%s",
+                self._chrome_pid,
+                cmdline,
+            )
+            return
+        try:
+            result = subprocess.run(
+                ["taskkill", "/PID", str(self._chrome_pid), "/T", "/F"],
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+            logger.warning(
+                "Forced Chrome termination. pid=%s returncode=%s stdout=%s stderr=%s",
+                self._chrome_pid,
+                result.returncode,
+                (result.stdout or "").strip(),
+                (result.stderr or "").strip(),
+            )
+        except Exception:
+            logger.exception("Forced Chrome termination failed. pid=%s", self._chrome_pid)
+
+    def _should_force_kill(self, cmdline: Optional[str]) -> bool:
+        if not cmdline:
+            return False
+        cmdline_lower = cmdline.lower()
+        profile_dir = (self._active_profile_dir or "").lower()
+        has_profile = profile_dir and profile_dir in cmdline_lower
+        port = None
+        if self._chrome_debugger_address:
+            try:
+                port = int(self._chrome_debugger_address.rsplit(":", 1)[-1])
+            except (ValueError, AttributeError):
+                port = None
+        has_port = port is not None and f"--remote-debugging-port={port}" in cmdline_lower
+        return has_profile or has_port
