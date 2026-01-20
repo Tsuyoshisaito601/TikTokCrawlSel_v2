@@ -646,3 +646,19 @@ class InstaVideoRepository:
                 data.crawled_at,
             ),
         )
+
+    def get_insta_video_ids_with_title(self, video_ids: List[str]) -> Set[str]:
+        if not video_ids:
+            return set()
+        placeholders = ", ".join(["%s"] * len(video_ids))
+        query = f"""
+            SELECT video_id
+            FROM insta_heavy_raw_data
+            WHERE video_id IN ({placeholders})
+              AND video_title IS NOT NULL
+              AND video_title <> ''
+        """
+        cursor = self.db.execute_query(query, tuple(video_ids))
+        rows = cursor.fetchall()
+        cursor.close()
+        return {row[0] for row in rows}

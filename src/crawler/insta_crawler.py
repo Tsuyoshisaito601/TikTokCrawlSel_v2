@@ -5,7 +5,7 @@ import re
 import time
 from datetime import date, datetime, timedelta
 from urllib.parse import urlparse
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, Optional, Set, Tuple
 
 from google.cloud import pubsub_v1
 from selenium.webdriver.common.by import By
@@ -588,7 +588,8 @@ class InstaCrawler:
 
     def collect_reel_heavy_data_map(
         self, light_like_datas: List[Dict], user_username: str = None,
-        fetch_comments: bool = True, comment_limit: int = 20
+        fetch_comments: bool = True, comment_limit: int = 20,
+        skip_video_ids: Optional[Set[str]] = None
     ) -> Dict[str, Dict[str, Optional[str]]]:
         """
         リール詳細データを収集する。
@@ -596,13 +597,16 @@ class InstaCrawler:
         詳細取得後は閉じるボタンでリールページに戻る。
         """
         heavy_map: Dict[str, Dict[str, Optional[str]]] = {}
+        skip_video_ids = skip_video_ids or set()
         
         if not user_username and light_like_datas:
             user_username = light_like_datas[0].get("user_username")
         
         if not user_username:
             logger.warning("user_usernameが不明なため、URL遷移方式にフォールバックします")
-            return self._collect_reel_heavy_data_map_by_url(light_like_datas, fetch_comments, comment_limit)
+            return self._collect_reel_heavy_data_map_by_url(
+                light_like_datas, fetch_comments, comment_limit, skip_video_ids
+            )
         
         # リールページにいることを確認（いなければ遷移）
         reels_path = f"/{user_username}/reels/"
@@ -616,6 +620,8 @@ class InstaCrawler:
             video_url = like_data.get("video_url")
             video_id = like_data.get("video_id")
             if not video_url or not video_id:
+                continue
+            if video_id in skip_video_ids:
                 continue
             
             try:
@@ -645,14 +651,18 @@ class InstaCrawler:
         return heavy_map
 
     def _collect_reel_heavy_data_map_by_url(
-        self, light_like_datas: List[Dict], fetch_comments: bool = True, comment_limit: int = 20
+        self, light_like_datas: List[Dict], fetch_comments: bool = True, comment_limit: int = 20,
+        skip_video_ids: Optional[Set[str]] = None
     ) -> Dict[str, Dict[str, Optional[str]]]:
         """フォールバック用: URL遷移方式で詳細データを収集する（旧実装）"""
         heavy_map: Dict[str, Dict[str, Optional[str]]] = {}
+        skip_video_ids = skip_video_ids or set()
         for like_data in light_like_datas:
             video_url = like_data.get("video_url")
             video_id = like_data.get("video_id")
             if not video_url or not video_id:
+                continue
+            if video_id in skip_video_ids:
                 continue
             try:
                 self.driver.get(video_url)
@@ -943,30 +953,55 @@ class InstaCrawler:
                 user_nickname=user_nickname,
                 publish=False,
             )
-        # user_username引数を追加
-        heavy_data_map = self.collect_reel_heavy_data_map(
-            light_like_datas,
-            user_username=user.favorite_user_username,
-            fetch_comments=True
-        )
+        skip_video_ids: Set[str] = set()
+        missing_title_ids: List[str] = []
         for like_data in light_like_datas:
-            heavy = heavy_data_map.get(like_data["video_id"])
-            if heavy:
-                like_data.update(
-                    {
-                        "video_title": heavy.get("video_title"),
-                        "audio_info_text": heavy.get("audio_info_text"),
-                        "audio_title": heavy.get("audio_info_text"),
-                        "post_time_text": heavy.get("post_time_text"),
-                        "post_time_iso": heavy.get("post_time_iso"),
-                        "comments_json": heavy.get("comments_json"),
-                    }
-                )
-        self.parse_and_save_video_heavy_datas(
-            light_like_datas,
-            user_nickname=user_nickname,
-            publish=False,
-        )
+            video_id = like_data.get("video_id")
+            if not video_id:
+                continue
+            if (like_data.get("video_title") or "").strip():
+                skip_video_ids.add(video_id)
+            else:
+                missing_title_ids.append(video_id)
+
+        if missing_title_ids:
+            existing_ids = self.video_repo.get_insta_video_ids_with_title(missing_title_ids)
+            skip_video_ids.update(existing_ids)
+
+        heavy_like_datas = [
+            like_data
+            for like_data in light_like_datas
+            if like_data.get("video_id") and like_data["video_id"] not in skip_video_ids
+        ]
+
+        if heavy_like_datas:
+            # user_username引数を追加
+            heavy_data_map = self.collect_reel_heavy_data_map(
+                light_like_datas,
+                user_username=user.favorite_user_username,
+                fetch_comments=True,
+                skip_video_ids=skip_video_ids,
+            )
+            for like_data in heavy_like_datas:
+                heavy = heavy_data_map.get(like_data["video_id"])
+                if heavy:
+                    like_data.update(
+                        {
+                            "video_title": heavy.get("video_title"),
+                            "audio_info_text": heavy.get("audio_info_text"),
+                            "audio_title": heavy.get("audio_info_text"),
+                            "post_time_text": heavy.get("post_time_text"),
+                            "post_time_iso": heavy.get("post_time_iso"),
+                            "comments_json": heavy.get("comments_json"),
+                        }
+                    )
+            self.parse_and_save_video_heavy_datas(
+                heavy_like_datas,
+                user_nickname=user_nickname,
+                publish=False,
+            )
+        else:
+            logger.info("video_titleが既に保存済みのため、heavyデータ取得をスキップします")
 
         self.favorite_user_repo.update_favorite_user_last_crawled(
             user.favorite_user_username, datetime.now()
