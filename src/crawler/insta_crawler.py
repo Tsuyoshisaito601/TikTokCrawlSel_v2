@@ -1015,11 +1015,18 @@ class InstaCrawler:
         max_users: int = 10,
         mode: str = "both",
         run_deadline: Optional[float] = None,
+        favorite_users: Optional[List[FavoriteUser]] = None,
+        start_index: int = 0,
     ) -> Tuple[int, bool]:
-        logger.info(f"{max_users}件のユーザーに対してライトデータをクロールします")
-        favorite_users = self.favorite_user_repo.get_favorite_users(
-            self.crawler_account.id, limit=max_users
-        )
+        if favorite_users is None:
+            favorite_users = self.favorite_user_repo.get_favorite_users(
+                self.crawler_account.id, limit=max_users
+            )
+        else:
+            if start_index < 0:
+                start_index = 0
+            favorite_users = favorite_users[start_index:]
+        logger.info(f"{len(favorite_users)}件のユーザーに対してライトデータをクロールします")
         if not favorite_users:
             logger.info("クロール対象ユーザーが存在しません")
             return 0, False
@@ -1139,12 +1146,25 @@ def main():
                 raise ValueError("RUN_MINUTES と REST_MINUTES は1以上に設定してください")
             run_seconds = RUN_MINUTES * 60
             rest_seconds = REST_MINUTES * 60
-            while True:
+            crawler_account_id = args.crawler_account_id
+            if crawler_account_id is None:
+                account = crawler_account_repo.get_an_available_crawler_account()
+                if not account:
+                    raise Exception("利用可能なクローラーアカウントが存在しません")
+                crawler_account_id = account.id
+            favorite_users = favorite_user_repo.get_favorite_users(
+                crawler_account_id, limit=args.max_users
+            )
+            if not favorite_users:
+                logger.info("クロール対象ユーザーが存在しません")
+                return
+            start_index = 0
+            while start_index < len(favorite_users):
                 with InstaCrawler(
                     crawler_account_repo=crawler_account_repo,
                     favorite_user_repo=favorite_user_repo,
                     video_repo=video_repo,
-                    crawler_account_id=args.crawler_account_id,
+                    crawler_account_id=crawler_account_id,
                     sadcaptcha_api_key=os.getenv("SADCAPTCHA_API_KEY"),
                     device_type=args.device_type,
                     use_profile=args.use_profile,
@@ -1153,14 +1173,18 @@ def main():
                     use_proxy=not args.no_proxy,
                 ) as crawler:
                     run_deadline = time.monotonic() + run_seconds
-                    crawler.crawl_favorite_users(
+                    processed, _ = crawler.crawl_favorite_users(
                         max_videos_per_user=args.max_videos_per_user,
                         max_users=args.max_users,
                         mode=mode,
                         run_deadline=run_deadline,
+                        favorite_users=favorite_users,
+                        start_index=start_index,
                     )
-                logger.info(f"{REST_MINUTES}分休憩します")
-                time.sleep(rest_seconds)
+                start_index += processed
+                if start_index < len(favorite_users):
+                    logger.info(f"{REST_MINUTES}分休憩します")
+                    time.sleep(rest_seconds)
 
 
 if __name__ == "__main__":
