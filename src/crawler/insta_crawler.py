@@ -468,11 +468,15 @@ class InstaCrawler:
             raw_inner = title_elem.get_attribute("innerText")
             raw_text_content = title_elem.get_attribute("textContent")
             raw_text = title_elem.text
-            heavy_data["video_title"] = (
+            raw_title = (
                 title_elem.get_attribute("innerText")
                 or title_elem.get_attribute("textContent")
                 or title_elem.text
             )
+            if raw_title and raw_title.strip():
+                heavy_data["video_title"] = raw_title
+            else:
+                heavy_data["video_title"] = None
             logger.debug(
                 "video_title取得: innerText=%s textContent=%s text=%s",
                 raw_inner,
