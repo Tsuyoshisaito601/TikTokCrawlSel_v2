@@ -656,7 +656,7 @@ class InstaVideoRepository:
             FROM insta_heavy_raw_data
             WHERE video_id IN ({placeholders})
               AND video_title IS NOT NULL
-              AND video_title <> ''
+              AND TRIM(video_title) <> ''
         """
         cursor = self.db.execute_query(query, tuple(video_ids))
         rows = cursor.fetchall()
