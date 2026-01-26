@@ -461,28 +461,40 @@ class InstaCrawler:
             logger.warning("投稿日タイムスタンプの取得に失敗しました", exc_info=True)
 
         try:
-            title_elem = self.wait.until(
-                EC.presence_of_element_located((By.CSS_SELECTOR, self.VIDEO_TITLE_SELECTOR))
-            )
-            # ハッシュタグを含む全文を innerText/textContent で取得（改行も保持）
-            raw_inner = title_elem.get_attribute("innerText")
-            raw_text_content = title_elem.get_attribute("textContent")
-            raw_text = title_elem.text
-            raw_title = (
-                title_elem.get_attribute("innerText")
-                or title_elem.get_attribute("textContent")
-                or title_elem.text
-            )
-            if raw_title and raw_title.strip():
-                heavy_data["video_title"] = raw_title
+            # 複数のタイトル候補から最も長いテキストを持つものを選択
+            video_title_selector = self.VIDEO_TITLE_SELECTOR
+
+            def get_best_title(driver):
+                try:
+                    h1_elements = driver.find_elements(By.CSS_SELECTOR, video_title_selector)
+                    if not h1_elements:
+                        return False
+
+                    best_title = None
+                    max_length = 0
+
+                    for elem in h1_elements:
+                        raw_title = (
+                            elem.get_attribute("innerText")
+                            or elem.get_attribute("textContent")
+                            or ""
+                        )
+                        text_length = len(raw_title.strip())
+
+                        if text_length > max_length:
+                            max_length = text_length
+                            best_title = raw_title.strip()
+
+                    return best_title if best_title else False
+                except Exception:
+                    return False
+
+            title_text = self.wait.until(get_best_title)
+            if title_text:
+                heavy_data["video_title"] = title_text
             else:
                 heavy_data["video_title"] = None
-            logger.debug(
-                "video_title取得: innerText=%s textContent=%s text=%s",
-                raw_inner,
-                raw_text_content,
-                raw_text,
-            )
+            logger.debug("video_title取得 (best_title): %s", title_text)
         except TimeoutException:
             logger.debug("動画タイトルが見つかりませんでした")
 
