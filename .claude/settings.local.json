@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(find D:app_ssdSigmaScout_Bot -type f -name *.py ! -path */node_modules/*)",
+      "Bash(find D:app_ssdSigmaScout_Botbackend -type f -name *.py)",
+      "Bash(grep -r \"selenium\\\\|webdriver\\\\|chromedriver\\\\|execute_cdp\\\\|Emulation\" D:app_ssdSigmaScout_Botbackend --include=*.js)"
+    ]
+  }
+}

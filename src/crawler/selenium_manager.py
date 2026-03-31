@@ -102,35 +102,11 @@ class SeleniumManager:
             self._cache_chrome_process_info()
             self._log_chrome_process_snapshot("after_start")
 
-            # PC用のエミュレーション設定
+            # ウィンドウサイズ設定
             if self.device_type == "pc":
-                self.driver.execute_cdp_cmd(
-                    "Emulation.setDeviceMetricsOverride",
-                    {
-                        "width": 1920,
-                        "height": 1080,
-                        "deviceScaleFactor": 1,
-                        "mobile": False,
-                        "screenWidth": 1920,
-                        "screenHeight": 1080,
-                        "positionX": 0,
-                        "positionY": 0,
-                    },
-                )    
+                self.driver.set_window_size(1920, 1080)
             elif self.device_type == "vps":
-                self.driver.execute_cdp_cmd(
-                    "Emulation.setDeviceMetricsOverride",
-                    {
-                        "width": 1024,
-                        "height": 576,
-                        "deviceScaleFactor": 1,
-                        "mobile": False,
-                        "screenWidth": 1024,
-                        "screenHeight": 576,
-                        "positionX": 0,
-                        "positionY": 0,
-                    },
-                )   
+                self.driver.set_window_size(1024, 576)   
 
             if self.sadcaptcha_api_key:
                 # CAPTCHA Solver使用時
