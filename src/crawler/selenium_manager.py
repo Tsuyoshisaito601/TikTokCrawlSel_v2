@@ -13,7 +13,7 @@ from selenium.common.exceptions import (
 from concurrent.futures import ThreadPoolExecutor
 from typing import Optional
 from ..logger import setup_logger
-import tempfile, shutil, os, time, logging, subprocess
+import tempfile, shutil, os, time, logging, subprocess, ssl
 
 logger = setup_logger(__name__)
 
@@ -98,7 +98,13 @@ class SeleniumManager:
             # 以下のオプションを追加することを推奨
             options.add_argument("--disable-blink-features=AutomationControlled")
 
-            self.driver = uc.Chrome(options=options)
+            # SSL証明書エラー回避（undetected_chromedriver がChromeDriverをダウンロードする際に必要）
+            _original_ctx = ssl._create_default_https_context
+            ssl._create_default_https_context = ssl._create_unverified_context
+            try:
+                self.driver = uc.Chrome(options=options)
+            finally:
+                ssl._create_default_https_context = _original_ctx
             self._cache_chrome_process_info()
             self._log_chrome_process_snapshot("after_start")
 

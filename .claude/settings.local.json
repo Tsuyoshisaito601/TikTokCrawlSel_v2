@@ -3,7 +3,10 @@
     "allow": [
       "Bash(find D:app_ssdSigmaScout_Bot -type f -name *.py ! -path */node_modules/*)",
       "Bash(find D:app_ssdSigmaScout_Botbackend -type f -name *.py)",
-      "Bash(grep -r \"selenium\\\\|webdriver\\\\|chromedriver\\\\|execute_cdp\\\\|Emulation\" D:app_ssdSigmaScout_Botbackend --include=*.js)"
+      "Bash(grep -r \"selenium\\\\|webdriver\\\\|chromedriver\\\\|execute_cdp\\\\|Emulation\" D:app_ssdSigmaScout_Botbackend --include=*.js)",
+      "Read(//d/app_ssd/Sigma/Scout_Bot/**)",
+      "Bash(find D:/app_ssd/Sigma/Scout_Bot -name .env.docker -o -name env.docker -o -name *.env*)",
+      "Bash(grep -r \"NODE_TLS\\\\|npm_config_strict_ssl\\\\|CHROMEDRIVER_SKIP\\\\|npm config\" D:/app_ssd/Sigma/Scout_Bot/backend --include=*.js --include=*.json --include=*.sh)"
     ]
   }
 }
