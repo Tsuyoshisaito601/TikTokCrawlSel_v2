@@ -832,7 +832,7 @@ class TikTokCrawler:
                 audio_info_text = ""
         like_count_text = self.driver.find_element(By.CSS_SELECTOR, "strong[data-e2e='browse-like-count'],strong[data-e2e='like-count']").text
         comment_count_text = self.driver.find_element(By.CSS_SELECTOR, "strong[data-e2e='browse-comment-count'],strong[data-e2e='comment-count']").text
-        collect_count_text = self.driver.find_element(By.CSS_SELECTOR, "strong[data-e2e='undefined-count']").text
+        collect_count_text = self.driver.find_element(By.CSS_SELECTOR, "strong[data-e2e='browse-favorite-count'],strong[data-e2e='favorite-count']").text
         
         # 取得したテキストを処理
         full_text = post_time_element.text
