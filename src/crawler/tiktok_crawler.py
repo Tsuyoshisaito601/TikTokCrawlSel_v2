@@ -925,7 +925,7 @@ class TikTokCrawler:
 
         like_count_text = self.driver.find_element(By.CSS_SELECTOR, "strong[data-e2e='like-count']").text
         comment_count_text = self.driver.find_element(By.CSS_SELECTOR, "strong[data-e2e='comment-count']").text
-        collect_count_text = self.driver.find_element(By.CSS_SELECTOR, "strong[data-e2e='undefined-count']").text
+        collect_count_text = self.driver.find_element(By.CSS_SELECTOR, "strong[data-e2e='browse-favorite-count'],strong[data-e2e='favorite-count']").text
 
         logger.debug(f"動画の重いデータを取得しました: {video_url}")
 
